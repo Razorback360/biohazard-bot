@@ -15,6 +15,7 @@ x = open("config.json", "r")
 configuration = json.load(x)
 
 bot = commands.Bot(command_prefix=tuple(configuration['Prefixes']), case_insensitive=True)
+bot.remove_command("help")
 
 @bot.event
 async def on_ready():
@@ -27,7 +28,7 @@ async def add(ctx, title, link, description):
     password_characters = string.digits
     UniqueID = ''.join(random.choice(password_characters) for _ in range(12))
 
-    AwaitingApproval = discord.Embed(title=title, description=None, color=0x77c128)
+    AwaitingApproval = discord.Embed(title=title, description=f"Submitter: <@{ctx.author.id}>", color=0x77c128)
     AwaitingApproval.add_field(name=link, value=description, inline=False)
     AwaitingApproval.add_field(name="Unique ID", value=int(UniqueID), inline=False)
 
@@ -35,7 +36,7 @@ async def add(ctx, title, link, description):
     await ApprovalChannel.send(embed=AwaitingApproval)
     await ctx.send("Thanks for your submission! The mods will check it out and approve or deny it.")
 
-    NewSub = {"id": int(UniqueID), "title": title, "link": link, "description": description}
+    NewSub = {"id": int(UniqueID), "title": title, "link": link, "description": description, "user": ctx.author.id}
 
     submissionsFile = open("submissions.json", "r")
     submissions = json.load(submissionsFile)
@@ -57,7 +58,7 @@ async def approve(ctx, UniqueID, ChannelID):
 
     for i, submission in enumerate(submissions):
         if submission["id"] == int(UniqueID):
-            ApprovedSub = discord.Embed(title=submission['title'], description=None, color=0x77c128)
+            ApprovedSub = discord.Embed(title=submission['title'], description=f"Thanks to <@{submission['user']}>!", color=0x77c128)
             ApprovedSub.add_field(name=submission['link'], value=submission['description'], inline=False)
 
             await channel.send(embed=ApprovedSub)
@@ -96,6 +97,16 @@ async def deny(ctx, UniqueID):
     else:
         await ctx.send("The ID provided is not a valid one. Please provide a valid ID.")
         return
+
+@bot.command()
+async def help(ctx):
+    helpEmbed = discord.Embed(title="Help!", description="These are the available commands!", color=0x77c128)
+    helpEmbed.add_field(name=f'{configuration["Prefixes"][0]}add "title" "link" "description"', value="Adds a submission to the submission queue. Please provide all the command parameters as they are not optional and use double quotation marks for each parameter.")
+    helpEmbed.add_field(name=f'{configuration["Prefixes"][0]}approve [unique id] [channel id]', value="ADMIN COMMAND ONLY. Approves a submission with id [unique id] and sends it to channel with id [channel id]. Don't include the square brackets they are not part of the command.")
+    helpEmbed.add_field(name=f'{configuration["Prefixes"][0]}deny [unique id]', value="ADMIN COMMAND ONLY. Denies a submission with id [unique id]. Don't include the square brackets they are not part of the command.")
+
+    await ctx.send(embed=helpEmbed)
+
 
 @approve.error
 @deny.error
