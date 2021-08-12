@@ -2,6 +2,7 @@
 # PLEASE RUN "pip install -r requirements"                            #
 # PLEASE EDIT CONFIG.JSON WITH THE CONFIGURATION THAT YOU LIKE        #
 # GENERATE A BOT TOKEN AT https://discord.com/developers/applications #
+# PLEASE ENABLE SERVER MEMBERS INTENT ON THE BOT YOU CREATE           #
 #######################################################################
 
 import discord
@@ -10,7 +11,7 @@ from discord.ext.commands import MissingPermissions
 import json
 import string
 import random
-
+import datetime
 from discord.ext.commands.core import cooldown
 import utils
 import luhn
@@ -18,7 +19,10 @@ import luhn
 x = open("config.json", "r")
 configuration = json.load(x)
 
-bot = commands.Bot(command_prefix=tuple(configuration['Prefixes']), case_insensitive=True)
+intents = discord.Intents.default()
+intents.members = True
+
+bot = commands.Bot(command_prefix=tuple(configuration['Prefixes']), case_insensitive=True, intents=intents)
 bot.remove_command("help")
 
 @bot.event
@@ -28,6 +32,7 @@ async def on_ready():
 
 
 @bot.command()
+@commands.cooldown(1, 10, commands.BucketType.user)
 async def add(ctx, title, link, description):
     password_characters = string.digits
     UniqueID = ''.join(random.choice(password_characters) for _ in range(12))
@@ -135,6 +140,65 @@ async def validate(ctx, CC):
     else:
         await ctx.send("The provided CC number is invalid.")
 
+@bot.command()
+@commands.cooldown(1, 10, commands.BucketType.user)
+async def whois(ctx):
+    if ctx.message.mentions:
+        for x in ctx.message.mentions:
+            duration = datetime.datetime.now() - x.joined_at
+
+            hours, remainder = divmod(int(duration .total_seconds()), 3600)
+            minutes, seconds = divmod(remainder, 60)
+            days, hours = divmod(hours, 24)
+
+            created_at = datetime.datetime.now() - x.created_at
+
+            created_athours, created_atremainder = divmod(int(created_at .total_seconds()), 3600)
+            created_atminutes, created_atseconds = divmod(created_atremainder, 60)
+            created_atdays, created_athours = divmod(created_athours, 24)
+
+            roles = str([y.mention for y in x.roles]).replace('[','').replace(']','').replace('\'','')
+
+            embed = discord.Embed(title="User Info", description=f"Here is <@{x.id}> profile details.")
+            embed.set_thumbnail(url=x.avatar_url)
+            embed.add_field(name="Id", value=x.id)
+            embed.add_field(name="Created At", value=x.created_at.strftime('%d, %b %Y'))
+            embed.add_field(name="Joined At", value=x.joined_at.strftime('%d, %b %Y'))
+            embed.add_field(name="Display Name", value=x.display_name)
+            embed.add_field(name="Avatar", value=f"[Link]({x.avatar_url})")
+            embed.add_field(name="Roles", value=roles)
+            embed.add_field(name="Account Age", value=f"{created_atdays} days, {created_athours} hours")
+            embed.add_field(name="Join Age", value=f"{days} days, {hours} hours")
+
+            await ctx.send(embed=embed)
+    else:
+        user = ctx.message.author.id
+        x = ctx.guild.get_member(user_id=user)
+        duration = datetime.datetime.now() - x.joined_at
+
+        hours, remainder = divmod(int(duration .total_seconds()), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        days, hours = divmod(hours, 24)
+
+        created_at = datetime.datetime.now() - x.created_at
+        created_athours, created_atremainder = divmod(int(created_at .total_seconds()), 3600)
+        created_atminutes, created_atseconds = divmod(created_atremainder, 60)
+        created_atdays, created_athours = divmod(created_athours, 24)
+
+        roles = str([y.mention for y in x.roles]).replace('[','').replace(']','').replace('\'','')
+
+        embed = discord.Embed(title="User Info", description=f"Here is <@{x.id}> profile details.")
+        embed.set_thumbnail(url=x.avatar_url)
+        embed.add_field(name="Id", value=x.id)
+        embed.add_field(name="Created At", value=x.created_at.strftime('%d, %b %Y'))
+        embed.add_field(name="Joined At", value=x.joined_at.strftime('%d, %b %Y'))
+        embed.add_field(name="Display Name", value=x.display_name)
+        embed.add_field(name="Avatar", value=f"[Link]({x.avatar_url})")
+        embed.add_field(name="Roles", value=roles)
+        embed.add_field(name="Account Age", value=f"{created_atdays} days, {created_athours} hours")
+        embed.add_field(name="Join Age", value=f"{days} days, {hours} hours")
+
+        await ctx.send(embed=embed)
 
 @bot.command()
 async def help(ctx):
@@ -150,6 +214,8 @@ async def help(ctx):
 @deny.error
 @generate.error
 @validate.error
+@add.error
+@whois.error
 async def permissions_error(ctx, error):
     if isinstance(error, MissingPermissions):
         await ctx.send("This is an adminstrator only command. Please refrain from using it.")
