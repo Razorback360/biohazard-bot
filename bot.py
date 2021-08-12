@@ -12,9 +12,15 @@ import json
 import string
 import random
 import datetime
-from discord.ext.commands.core import cooldown
+from typing import Optional
+from discord.ext.commands.cooldowns import BucketType
+from discord.ext.commands.core import command
 import utils
 import luhn
+import os
+import time
+import threading
+import json
 
 x = open("config.json", "r")
 configuration = json.load(x)
@@ -25,11 +31,108 @@ intents.members = True
 bot = commands.Bot(command_prefix=tuple(configuration['Prefixes']), case_insensitive=True, intents=intents)
 bot.remove_command("help")
 
+with open("users.json", "ab+") as ab:
+    ab.close()
+    f = open('users.json','r+')
+    f.readline()
+    if os.stat("users.json").st_size == 0:
+      f.write("{}")
+      f.close()
+    else:
+      pass
+ 
+users = None
+
 @bot.event
 async def on_ready():
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=f"{configuration['Prefixes'][0]}help"))
     print("Im online and ready!")
 
+
+@bot.event
+async def on_member_join(member):
+    created_at = datetime.datetime.now() - member.created_at
+
+    created_athours, created_atremainder = divmod(int(created_at .total_seconds()), 3600)
+    created_atminutes, created_atseconds = divmod(created_atremainder, 60)
+    created_atdays, created_athours = divmod(created_athours, 24)
+    if int(created_atdays) < 7:
+        await member.send("Your account is less than a week old. You have been kicked. Join back after a week.")
+        await member.kick()
+
+@bot.event    
+async def on_message(message):
+    if message.author.bot == False:
+        global users
+        with open('users.json', 'r') as f:
+            users = json.load(f)
+        await add_experience(users, message.author, message)
+        await level_up(users, message.author, message)
+        with open('users.json', 'w') as f:
+            json.dump(users, f)
+            await bot.process_commands(message)
+ 
+async def add_experience(users, user, message):
+    if not f'{user.id}' in users:
+        users[f'{user.id}'] = {}
+        users[f'{user.id}']['experience'] = 0
+        users[f'{user.id}']['level'] = 0
+    xp = None
+    if len(message.clean_content) <= 10:
+        xp = 4
+    elif len(message.clean_content) <= 20:
+        xp = 6
+    elif len(message.clean_content) <= 40:
+        xp = 8
+    elif len(message.clean_content) <= 80:
+        xp = 10
+    else:
+        xp = 12
+    users[f'{user.id}']['experience'] += xp
+ 
+async def level_up(users, user, message):
+  experience = users[f'{user.id}']["experience"]
+  lvl_start = users[f'{user.id}']["level"]
+  lvl_end = int(experience ** (1 / 3))
+  if lvl_start < lvl_end:
+    await message.channel.send(f':tada: {user.mention} has reached level {lvl_end}. Congrats! :tada:')
+    users[f'{user.id}']["level"] = lvl_end
+ 
+@bot.command()
+@commands.cooldown(1, 10, commands.BucketType.user)
+async def level(ctx, member: discord.Member = None):
+    if member == None:
+        userlvl = users[f'{ctx.author.id}']['level']
+        userexp = users[f'{ctx.author.id}']['experience']
+        await ctx.send(f'{ctx.author.mention} You are at level {userlvl}, with XP {userexp}')
+    else:
+        userlvl2 = users[f'{member.id}']['level']
+        userexp2 = users[f'{member.id}']['experience']    
+        await ctx.send(f'{member.mention} is at level {userlvl2}, with XP {userexp2}')
+ 
+@bot.command()
+@commands.cooldown(1, 10, commands.BucketType.user)
+async def leaderboard(ctx):
+    data_levels = users.values()
+    levels = []
+    for x in data_levels:
+        levels.append(x['level'])
+
+    data_users = users.keys()
+    userrs = []
+    for x in data_users:
+        userrs.append(x)
+
+    userrs = [x for _,x in sorted(zip(levels,userrs), reverse=True)]
+    levels = sorted(levels, reverse=True)
+
+    stringThing = ''
+    rank = 1
+    for i, x in enumerate(userrs):
+        stringThing = stringThing + f"#{rank} <@{x}> : Level {levels[i]}\n"
+        rank += 1
+    embed = discord.Embed(title="Leaderboard", description=stringThing)
+    await ctx.send(embed=embed)
 
 @bot.command()
 @commands.cooldown(1, 10, commands.BucketType.user)
@@ -201,6 +304,35 @@ async def whois(ctx):
         await ctx.send(embed=embed)
 
 @bot.command()
+@commands.has_permissions(kick_members=True)
+async def kick(ctx, user_id: Optional[int]):
+    if ctx.message.mentions:
+        for x in ctx.message.mentions:
+            await x.kick()
+            await ctx.send(f"Kicked {x.mention}")
+    elif user_id:
+        x = ctx.guild.get_member(int(user_id))
+        await x.kick()
+        await ctx.send(f"Kicked {x.mention}")
+    else:
+        await ctx.send("You need to mention or provide the ID to kick!")
+
+@bot.command()
+@commands.has_permissions(ban_members=True)
+async def ban(ctx, user_id: Optional[int]):
+    if ctx.message.mentions:
+        for x in ctx.message.mentions:
+            await x.ban()
+            await ctx.send(f"Banned {x.mention}")
+    elif user_id:
+        x = ctx.guild.get_member(int(user_id))
+        await x.ban()
+        await ctx.send(f"Banned {x.mention}")
+    else:
+        await ctx.send("You need to mention user or provide the ID to ban!")
+
+
+@bot.command()
 async def help(ctx):
     helpEmbed = discord.Embed(title="Help!", description="These are the available commands!", color=0x77c128)
     helpEmbed.add_field(name=f'{configuration["Prefixes"][0]}add "title" "link" "description"', value="Adds a submission to the submission queue. Please provide all the command parameters as they are not optional and use double quotation marks for each parameter.")
@@ -216,13 +348,17 @@ async def help(ctx):
 @validate.error
 @add.error
 @whois.error
+@level.error
 async def permissions_error(ctx, error):
     if isinstance(error, MissingPermissions):
-        await ctx.send("This is an adminstrator only command. Please refrain from using it.")
+        await ctx.send(error)
         return
     if isinstance(error, commands.CommandOnCooldown):
         await ctx.send(error)
         return
+
+
+
 
 
 bot.run(configuration['BotToken'])
