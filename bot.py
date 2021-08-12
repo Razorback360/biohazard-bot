@@ -11,6 +11,10 @@ import json
 import string
 import random
 
+from discord.ext.commands.core import cooldown
+import utils
+import luhn
+
 x = open("config.json", "r")
 configuration = json.load(x)
 
@@ -98,6 +102,40 @@ async def deny(ctx, UniqueID):
         await ctx.send("The ID provided is not a valid one. Please provide a valid ID.")
         return
 
+
+@bot.command()
+@commands.cooldown(1, 60, commands.BucketType.user)
+async def generate(ctx, bin):
+    CCs = []
+    for x in range(5):
+        CCs.append(utils.luhn(bin))
+    
+    verified = []
+    for x in CCs:
+        verified.append(luhn.verify(x))
+    
+    final = []
+    for i, x in enumerate(verified):
+        if x:
+            final.append(CCs[i])
+        else:
+            pass
+    card = ""
+    for cc in final:
+        card = card + f"{cc}\n"
+    await ctx.send(f"Here are 5 validated credit card numbers:\n{card}")
+
+
+@bot.command()
+@commands.cooldown(1, 15, commands.BucketType.user)
+async def validate(ctx, CC):
+    valid = luhn.verify(CC)
+    if valid:
+        await ctx.send("The provided CC number is valid.")
+    else:
+        await ctx.send("The provided CC number is invalid.")
+
+
 @bot.command()
 async def help(ctx):
     helpEmbed = discord.Embed(title="Help!", description="These are the available commands!", color=0x77c128)
@@ -110,9 +148,15 @@ async def help(ctx):
 
 @approve.error
 @deny.error
+@generate.error
+@validate.error
 async def permissions_error(ctx, error):
     if isinstance(error, MissingPermissions):
         await ctx.send("This is an adminstrator only command. Please refrain from using it.")
+        return
+    if isinstance(error, commands.CommandOnCooldown):
+        await ctx.send(error)
+        return
 
 
 bot.run(configuration['BotToken'])
