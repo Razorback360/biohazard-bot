@@ -5,6 +5,7 @@
 # PLEASE ENABLE SERVER MEMBERS INTENT ON THE BOT YOU CREATE           #
 #######################################################################
 
+import asyncio
 import discord
 from discord.ext import commands
 from discord.ext.commands import MissingPermissions
@@ -70,8 +71,15 @@ async def on_message(message):
         await level_up(users, message.author, message)
         with open('users.json', 'w') as f:
             json.dump(users, f)
-            await bot.process_commands(message)
- 
+    with open('afk.json', 'r') as f:
+        afk = json.load(f)
+    if message.mentions:
+        for x in message.mentions:
+            if str(x.id) in afk:
+                await message.channel.send(f"{x.display_name} is AFK: {afk[f'{x.id}']}")
+    await bot.process_commands(message)
+
+
 async def add_experience(users, user, message):
     if not f'{user.id}' in users:
         users[f'{user.id}'] = {}
@@ -331,13 +339,39 @@ async def ban(ctx, user_id: Optional[int]):
     else:
         await ctx.send("You need to mention user or provide the ID to ban!")
 
+@bot.command()
+async def afk(ctx, *, arg):
+    afkFile = open("afk.json", "r")
+    afk = json.load(afkFile)
+    afk[f'{ctx.message.author.id}'] = arg
+    afkFile.close()
+
+    afkFile = open("afk.json", "w")
+    json.dump(afk, afkFile)
+    afkFile.close()
+    await ctx.send("You are now AFK. Use unafk command to remove your AFK status.")
+
+@bot.command()
+async def unafk(ctx):
+    afkFile = open("afk.json", "r")
+    afk = json.load(afkFile)
+    afkFile.close()
+    print(afk)
+    if str(ctx.message.author.id) in afk:
+        afk.pop(f"{ctx.message.author.id}")
+        afkFile = open("afk.json", "w")
+        json.dump(afk, afkFile)
+        afkFile.close()
+        await ctx.send("You are no longer AFK.")
+    else:
+        await ctx.send("You weren't AFK.")
 
 @bot.command()
 async def help(ctx):
     helpEmbed = discord.Embed(title="Help!", description="These are the available commands!", color=0x77c128)
-    helpEmbed.add_field(name=f'{configuration["Prefixes"][0]}add "title" "link" "description"', value="Adds a submission to the submission queue. Please provide all the command parameters as they are not optional and use double quotation marks for each parameter.")
-    helpEmbed.add_field(name=f'{configuration["Prefixes"][0]}approve [unique id] [channel id]', value="ADMIN COMMAND ONLY. Approves a submission with id [unique id] and sends it to channel with id [channel id]. Don't include the square brackets they are not part of the command.")
-    helpEmbed.add_field(name=f'{configuration["Prefixes"][0]}deny [unique id]', value="ADMIN COMMAND ONLY. Denies a submission with id [unique id]. Don't include the square brackets they are not part of the command.")
+    helpEmbed.add_field(name=f'{configuration["Prefixes"][0]}add "title" "link" "description"', value="Adds a submission to the submission queue. Please provide all the command parameters as they are not optional and use double quotation marks for each parameter.", inline=False)
+    helpEmbed.add_field(name=f'{configuration["Prefixes"][0]}approve [unique id] [channel id]', value="ADMIN COMMAND ONLY. Approves a submission with id [unique id] and sends it to channel with id [channel id]. Don't include the square brackets they are not part of the command.", inline=False)
+    helpEmbed.add_field(name=f'{configuration["Prefixes"][0]}deny [unique id]', value="ADMIN COMMAND ONLY. Denies a submission with id [unique id]. Don't include the square brackets they are not part of the command.", inline=False)
 
     await ctx.send(embed=helpEmbed)
 
