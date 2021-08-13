@@ -1,5 +1,6 @@
 {
-    "Prefixes": ["?","!"],
-    "BotToken": "",
-    "ApproveChannelID": 871465984039460864
+    "Prefixes": ["?", "!"], 
+    "BotToken": "", 
+    "ApproveChannelID": , 
+    "LogChannelID": 
 }

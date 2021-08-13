@@ -5,8 +5,9 @@
 # PLEASE ENABLE SERVER MEMBERS INTENT ON THE BOT YOU CREATE           #
 #######################################################################
 
-import asyncio
 import discord
+from discord import message
+from discord import reaction
 from discord.ext import commands
 from discord.ext.commands import MissingPermissions
 import json
@@ -14,17 +15,18 @@ import string
 import random
 import datetime
 from typing import Optional
-from discord.ext.commands.cooldowns import BucketType
-from discord.ext.commands.core import command
 import utils
 import luhn
 import os
-import time
-import threading
 import json
 
 x = open("config.json", "r")
 configuration = json.load(x)
+x.close()
+
+z = open("tickets.json", "r")
+tickets = json.load(z)
+z.close()
 
 intents = discord.Intents.default()
 intents.members = True
@@ -34,15 +36,16 @@ bot.remove_command("help")
 
 with open("users.json", "ab+") as ab:
     ab.close()
-    f = open('users.json','r+')
+    f = open('users.json', 'r+')
     f.readline()
     if os.stat("users.json").st_size == 0:
-      f.write("{}")
-      f.close()
+        f.write("{}")
+        f.close()
     else:
-      pass
- 
+        pass
+
 users = None
+
 
 @bot.event
 async def on_ready():
@@ -61,7 +64,8 @@ async def on_member_join(member):
         await member.send("Your account is less than a week old. You have been kicked. Join back after a week.")
         await member.kick()
 
-@bot.event    
+
+@bot.event
 async def on_message(message):
     if message.author.bot == False:
         global users
@@ -78,6 +82,34 @@ async def on_message(message):
             if str(x.id) in afk:
                 await message.channel.send(f"{x.display_name} is AFK: {afk[f'{x.id}']}")
     await bot.process_commands(message)
+
+
+@bot.event
+async def on_raw_reaction_add(payload):
+    global tickets
+    message = await bot.get_channel(payload.channel_id).fetch_message(payload.message_id)
+    reaction = discord.utils.get(message.reactions, emoji="📧")
+    user = payload.member
+    if "TicketChannel" in configuration:
+        if "TicketMessageID" in configuration:
+            if message.id == configuration['TicketMessageID']:
+                if user != bot.user:
+                    await message.remove_reaction(payload.emoji, user)
+                    if "CategoryID" in configuration:
+                        guild = bot.get_guild(id=payload.guild_id)
+                        category = guild.get_channel(configuration['CategoryID'])
+                        channel = await category.create_text_channel(user.display_name)
+                        roles = tuple()
+                        member = guild.get_member(user.id)
+                        await channel.edit(sync_permission=True)
+                        await channel.set_permissions(member, read_messages=True, send_messages=True, read_message_history=True)
+                        tickets.append({"user_id": user.id, "channel_id": channel.id})
+                        b = open("tickets.json", "w")
+                        json.dump(tickets, b)
+                        b.close()
+                        z = open("tickets.json", "r")
+                        tickets = json.load(z)
+                        z.close()
 
 
 async def add_experience(users, user, message):
@@ -97,15 +129,17 @@ async def add_experience(users, user, message):
     else:
         xp = 12
     users[f'{user.id}']['experience'] += xp
- 
+
+
 async def level_up(users, user, message):
-  experience = users[f'{user.id}']["experience"]
-  lvl_start = users[f'{user.id}']["level"]
-  lvl_end = int(experience ** (1 / 3))
-  if lvl_start < lvl_end:
-    await message.channel.send(f':tada: {user.mention} has reached level {lvl_end}. Congrats! :tada:')
-    users[f'{user.id}']["level"] = lvl_end
- 
+    experience = users[f'{user.id}']["experience"]
+    lvl_start = users[f'{user.id}']["level"]
+    lvl_end = int(experience ** (1 / 3))
+    if lvl_start < lvl_end:
+        await message.channel.send(f':tada: {user.mention} has reached level {lvl_end}. Congrats! :tada:')
+        users[f'{user.id}']["level"] = lvl_end
+
+
 @bot.command()
 @commands.cooldown(1, 10, commands.BucketType.user)
 async def level(ctx, member: discord.Member = None):
@@ -115,9 +149,10 @@ async def level(ctx, member: discord.Member = None):
         await ctx.send(f'{ctx.author.mention} You are at level {userlvl}, with XP {userexp}')
     else:
         userlvl2 = users[f'{member.id}']['level']
-        userexp2 = users[f'{member.id}']['experience']    
+        userexp2 = users[f'{member.id}']['experience']
         await ctx.send(f'{member.mention} is at level {userlvl2}, with XP {userexp2}')
- 
+
+
 @bot.command()
 @commands.cooldown(1, 10, commands.BucketType.user)
 async def leaderboard(ctx):
@@ -131,7 +166,7 @@ async def leaderboard(ctx):
     for x in data_users:
         userrs.append(x)
 
-    userrs = [x for _,x in sorted(zip(levels,userrs), reverse=True)]
+    userrs = [x for _, x in sorted(zip(levels, userrs), reverse=True)]
     levels = sorted(levels, reverse=True)
 
     stringThing = ''
@@ -141,6 +176,7 @@ async def leaderboard(ctx):
         rank += 1
     embed = discord.Embed(title="Leaderboard", description=stringThing)
     await ctx.send(embed=embed)
+
 
 @bot.command()
 @commands.cooldown(1, 10, commands.BucketType.user)
@@ -167,6 +203,7 @@ async def add(ctx, title, link, description):
     json.dump(submissions, submissionsFile)
     submissionsFile.close()
 
+
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def approve(ctx, UniqueID, ChannelID):
@@ -178,7 +215,9 @@ async def approve(ctx, UniqueID, ChannelID):
 
     for i, submission in enumerate(submissions):
         if submission["id"] == int(UniqueID):
-            ApprovedSub = discord.Embed(title=submission['title'], description=f"Thanks to <@{submission['user']}>!", color=0x77c128)
+            ApprovedSub = discord.Embed(
+                title=submission['title'],
+                description=f"Thanks to <@{submission['user']}>!", color=0x77c128)
             ApprovedSub.add_field(name=submission['link'], value=submission['description'], inline=False)
 
             await channel.send(embed=ApprovedSub)
@@ -187,7 +226,7 @@ async def approve(ctx, UniqueID, ChannelID):
             submissionsFile = open("submissions.json", "w")
             json.dump(submissions, submissionsFile)
             submissionsFile.close()
-            
+
             await ctx.send("Approved!")
             break
         else:
@@ -195,7 +234,8 @@ async def approve(ctx, UniqueID, ChannelID):
     else:
         await ctx.send("The ID provided is not a valid one. Please provide a valid ID.")
         return
-    
+
+
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def deny(ctx, UniqueID):
@@ -209,7 +249,7 @@ async def deny(ctx, UniqueID):
             submissionsFile = open("submissions.json", "w")
             json.dump(submissions, submissionsFile)
             submissionsFile.close()
-            
+
             await ctx.send("Denied!")
             break
         else:
@@ -225,11 +265,11 @@ async def generate(ctx, bin):
     CCs = []
     for x in range(5):
         CCs.append(utils.luhn(bin))
-    
+
     verified = []
     for x in CCs:
         verified.append(luhn.verify(x))
-    
+
     final = []
     for i, x in enumerate(verified):
         if x:
@@ -251,6 +291,7 @@ async def validate(ctx, CC):
     else:
         await ctx.send("The provided CC number is invalid.")
 
+
 @bot.command()
 @commands.cooldown(1, 10, commands.BucketType.user)
 async def whois(ctx):
@@ -268,7 +309,7 @@ async def whois(ctx):
             created_atminutes, created_atseconds = divmod(created_atremainder, 60)
             created_atdays, created_athours = divmod(created_athours, 24)
 
-            roles = str([y.mention for y in x.roles]).replace('[','').replace(']','').replace('\'','')
+            roles = str([y.mention for y in x.roles]).replace('[', '').replace(']', '').replace('\'', '')
 
             embed = discord.Embed(title="User Info", description=f"Here is <@{x.id}> profile details.")
             embed.set_thumbnail(url=x.avatar_url)
@@ -296,7 +337,7 @@ async def whois(ctx):
         created_atminutes, created_atseconds = divmod(created_atremainder, 60)
         created_atdays, created_athours = divmod(created_athours, 24)
 
-        roles = str([y.mention for y in x.roles]).replace('[','').replace(']','').replace('\'','')
+        roles = str([y.mention for y in x.roles]).replace('[', '').replace(']', '').replace('\'', '')
 
         embed = discord.Embed(title="User Info", description=f"Here is <@{x.id}> profile details.")
         embed.set_thumbnail(url=x.avatar_url)
@@ -310,6 +351,7 @@ async def whois(ctx):
         embed.add_field(name="Join Age", value=f"{days} days, {hours} hours")
 
         await ctx.send(embed=embed)
+
 
 @bot.command()
 @commands.has_permissions(kick_members=True)
@@ -325,6 +367,7 @@ async def kick(ctx, user_id: Optional[int]):
     else:
         await ctx.send("You need to mention or provide the ID to kick!")
 
+
 @bot.command()
 @commands.has_permissions(ban_members=True)
 async def ban(ctx, user_id: Optional[int]):
@@ -339,6 +382,7 @@ async def ban(ctx, user_id: Optional[int]):
     else:
         await ctx.send("You need to mention user or provide the ID to ban!")
 
+
 @bot.command()
 async def afk(ctx, *, arg):
     afkFile = open("afk.json", "r")
@@ -350,6 +394,7 @@ async def afk(ctx, *, arg):
     json.dump(afk, afkFile)
     afkFile.close()
     await ctx.send("You are now AFK. Use unafk command to remove your AFK status.")
+
 
 @bot.command()
 async def unafk(ctx):
@@ -366,12 +411,109 @@ async def unafk(ctx):
     else:
         await ctx.send("You weren't AFK.")
 
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def set_channel(ctx, category_id):
+    global configuration
+    global x
+    embed = discord.Embed(name="Create Ticket", description="React with :e_mail: to create a ticket")
+    channel = ctx.message.channel.id
+    message = await ctx.send(embed=embed)
+    await message.add_reaction("📧")
+    configuration['TicketChannel'] = channel
+    configuration['TicketMessageID'] = message.id
+    configuration['CategoryID'] = int(category_id)
+    y = open("config.json", "w")
+    json.dump(configuration, y)
+    y.close()
+    x.close()
+    x = open("config.json", "r")
+    configuration = json.load(x)
+    x.close()
+    await ctx.message.delete()
+
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def close_ticket(ctx, channel_id: Optional[int]):
+    global tickets
+    if channel_id:
+        for i, ticket in enumerate(tickets):
+            if ticket['channel_id'] == channel_id:
+                channel = bot.get_channel(id=channel_id)
+                log = bot.get_channel(id=configuration['LogChannelID'])
+                messages = await channel.history(limit=None).flatten()
+
+                htmlfile = open(f"{ticket['user_id']}.html", "a")
+                for f in messages:
+                    htmlfile.write(f'[{f.created_at}]  {f.author}  |  {f.channel.name}  |  {f.content} <br> \n')
+                htmlfile.close()
+
+                await log.send(file=discord.File(fr"{ticket['user_id']}.html"), filename=f"{ticket['user_id']}.html")
+
+                tickets.pop(i)
+                await channel.delete()
+                await ctx.send("Ticket Closed.")
+
+                b = open("tickets.json", "w")
+                json.dump(tickets, b)
+                b.close()
+                z = open("tickets.json", "r")
+                tickets = json.load(z)
+                z.close()
+                os.remove(f"{ticket['user_id']}.html")
+                return
+            else:
+                continue
+        else:
+            await ctx.send("Not a ticket.")
+    else:
+        for i, ticket in enumerate(tickets):
+            if ticket['channel_id'] == ctx.channel.id:
+                channel = bot.get_channel(id=ctx.channel.id)
+
+                log = bot.get_channel(id=configuration['LogChannelID'])
+                messages = await channel.history(limit=None).flatten()
+
+                htmlfile = open(f"{ticket['user_id']}.html", "a")
+                for f in messages:
+                    htmlfile.write(f'[{f.created_at}]  {f.author}  |  {f.channel.name}  |  {f.content} <br> \n')
+                htmlfile.close()
+
+                await log.send(file=discord.File(fr"{ticket['user_id']}.html"))
+
+                tickets.pop(i)
+                await channel.delete()
+                b = open("tickets.json", "w")
+                json.dump(tickets, b)
+                b.close()
+                z = open("tickets.json", "r")
+                tickets = json.load(z)
+                z.close()
+                os.remove(f"{ticket['user_id']}.html")
+                return
+            else:
+                continue
+        else:
+            await ctx.send("Not a ticket.")
+
+
 @bot.command()
 async def help(ctx):
     helpEmbed = discord.Embed(title="Help!", description="These are the available commands!", color=0x77c128)
-    helpEmbed.add_field(name=f'{configuration["Prefixes"][0]}add "title" "link" "description"', value="Adds a submission to the submission queue. Please provide all the command parameters as they are not optional and use double quotation marks for each parameter.", inline=False)
-    helpEmbed.add_field(name=f'{configuration["Prefixes"][0]}approve [unique id] [channel id]', value="ADMIN COMMAND ONLY. Approves a submission with id [unique id] and sends it to channel with id [channel id]. Don't include the square brackets they are not part of the command.", inline=False)
-    helpEmbed.add_field(name=f'{configuration["Prefixes"][0]}deny [unique id]', value="ADMIN COMMAND ONLY. Denies a submission with id [unique id]. Don't include the square brackets they are not part of the command.", inline=False)
+    helpEmbed.add_field(
+        name=f'{configuration["Prefixes"][0]}add "title" "link" "description"',
+        value="Adds a submission to the submission queue. Please provide all the command parameters as they are not optional and use double quotation marks for each parameter.",
+        inline=False)
+    helpEmbed.add_field(
+        name=f'{configuration["Prefixes"][0]}approve [unique id] [channel id]',
+        value="ADMIN COMMAND ONLY. Approves a submission with id [unique id] and sends it to channel with id [channel id]. Don't include the square brackets they are not part of the command.",
+        inline=False)
+    helpEmbed.add_field(
+        name=f'{configuration["Prefixes"][0]}deny [unique id]',
+        value="ADMIN COMMAND ONLY. Denies a submission with id [unique id]. Don't include the square brackets they are not part of the command.",
+        inline=False)
 
     await ctx.send(embed=helpEmbed)
 
@@ -390,9 +532,6 @@ async def permissions_error(ctx, error):
     if isinstance(error, commands.CommandOnCooldown):
         await ctx.send(error)
         return
-
-
-
 
 
 bot.run(configuration['BotToken'])
