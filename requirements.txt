@@ -1,2 +1,4 @@
 discord.py
 luhn
+chat_exporter
+tortoise-orm
