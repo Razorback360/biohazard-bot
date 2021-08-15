@@ -126,8 +126,8 @@ async def level_up(users, message):
     lvl_start = users.level
     lvl_end = int(experience ** (1 / 3))
     if lvl_start < lvl_end:
-        await message.channel.send(f':tada: <@{users.user_id} has reached level {lvl_end}. Congrats! :tada:')
-        await Levels.filter(user_id=message.author.id).update(level=users.level + lvl_end)
+        await message.channel.send(f':tada: <@{users.user_id}> has reached level {lvl_end}. Congrats! :tada:')
+        await Levels.filter(user_id=message.author.id).update(level=lvl_end)
 
 
 @bot.command()
