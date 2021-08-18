@@ -29,4 +29,11 @@ class Levels(Model):
     user_id = fields.IntField(null=False)
     experience = fields.IntField(null=False)
     level = fields.IntField(null=True)
+
+
+class RoleBlacklist(Model):
+    class Meta:
+        table = "roleblacklist"
     
+    id = fields.IntField(pk=True, null=False, generated=True)
+    role_id = fields.IntField(null=False)

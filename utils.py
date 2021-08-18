@@ -27,9 +27,18 @@ def cvv_date():
     maximum = 9
     cvv = f"{random.randint(minimum, maximum)}{random.randint(minimum, maximum)}{random.randint(minimum, maximum)}"
     now = int(datetime.datetime.now().strftime("%y"))
+    now_month = int(datetime.datetime.now().strftime("%m"))
     new_min = now
     new_max = now + 10
     month_min = 1
     month_max = 12
-    date = f"{str(random.randint(month_min, month_max)).rjust(2, '0')}/{random.randint(new_min, new_max)}"
+    year = random.randint(new_min, new_max)
+    if year == new_min:
+        if now_month == 12:
+            date = f"{str(random.randint(month_min, month_max)).rjust(2, '0')}/{year + 1}"
+        else:
+            date = f"{str(random.randint(now_month + 1, month_max)).rjust(2, '0')}/{year}"
+    else:
+        date = f"{str(random.randint(month_min, month_max)).rjust(2, '0')}/{year}"
+
     return {"cvv": cvv, "date": date}

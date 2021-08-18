@@ -18,7 +18,7 @@ import luhn
 import os
 import json
 from tortoise import Tortoise
-from database import Levels, AFK, Submissions
+from database import Levels, AFK, Submissions, RoleBlacklist
 from tortoise.exceptions import DoesNotExist
 import chat_exporter
 import io
@@ -64,6 +64,14 @@ async def on_member_join(member):
 @bot.event
 async def on_message(message):
     if message.author.bot == False:
+        for role in message.author.roles:
+            try:
+                await RoleBlacklist.get(role_id=role.id)
+                await bot.process_commands(message)
+                return
+            except DoesNotExist:
+                pass
+                continue
         try:
             user = await Levels.get(user_id=message.author.id)
             await add_experience(user, message.author, message)
@@ -97,6 +105,7 @@ async def on_raw_reaction_add(payload):
                         member = guild.get_member(user.id)
                         await channel.edit(sync_permission=True)
                         await channel.set_permissions(member, read_messages=True, send_messages=True, read_message_history=True)
+                        await channel.send(member.mention)
 
 
 async def add_experience(users, user, message):
@@ -125,7 +134,12 @@ async def level_up(users, message):
     lvl_start = users.level
     lvl_end = int(experience ** (1 / 3))
     if lvl_start < lvl_end:
-        await message.channel.send(f':tada: <@{users.user_id}> has reached level {lvl_end}. Congrats! :tada:')
+        if "LevelLogChannel" in configuration:
+            guild = message.guild
+            channel = guild.get_channel(configuration["LevelLogChannel"])
+            await channel.send(f':tada: <@{users.user_id}> has reached level {lvl_end}. Congrats! :tada:')
+        else:
+            await message.channel.send(f':tada: <@{users.user_id}> has reached level {lvl_end}. Congrats! :tada:')
         await Levels.filter(user_id=message.author.id).update(level=lvl_end)
 
 
@@ -225,6 +239,10 @@ async def deny(ctx, UniqueID):
 @bot.command()
 @commands.cooldown(1, 60, commands.BucketType.user)
 async def generate(ctx, bin):
+    length = len(str(bin))
+    if length > 6 or length < 6:
+        await ctx.send("Only 6 digit bins please!")
+        return
     CCs = []
     for x in range(5):
         CCs.append(utils.luhn(bin))
@@ -409,6 +427,76 @@ async def close_ticket(ctx):
     
     await log.send(file=transcript_file)
     await ctx.channel.delete()
+
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def blacklist(ctx, role_id: Optional[int]):
+    if ctx.message.role_mentions:
+        for role in ctx.message.role_mentions:
+            await RoleBlacklist(role_id=role.id).save()
+            await ctx.send("Role blacklisted.")
+    elif role_id:
+        if ctx.guild.get_role(role_id):
+            await RoleBlacklist(role_id=role_id).save()
+            await ctx.send("Role blacklisted.")
+        else: 
+            await ctx.send("Invalid role id")
+    else:
+        await ctx.send("No role was mentioned or no role_id was provided.")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def unblacklist(ctx, role_id: Optional[int]):
+    if role_id:
+        try:
+            await RoleBlacklist.get(role_id=role_id)
+            await RoleBlacklist.filter(role_id=role_id).delete()
+            await ctx.send("Role unblacklisted.")
+        except:
+            await ctx.send("Provided role_id is inavlid or not in the DB.")
+        await ctx.send("Role blacklisted.")
+    elif ctx.message.role_mentions:
+        for role in ctx.message.role_mentions:
+            try:
+                await RoleBlacklist.get(role_id=role.id)
+                await RoleBlacklist.filter(role_id=role.id).delete()
+                await ctx.send("Role unblacklisted.")
+            except:
+                await ctx.send("Provided role is not blacklisted.")
+    else:
+        await ctx.send("No role was mentioned or no role_id was provided.")
+
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def set_level_channel(ctx, channel_id: Optional[int]):
+    global configuration
+    global x
+    if ctx.message.channel_mentions:
+        for channel in ctx.message.channel_mentions:
+            configuration['LevelLogChannel'] = channel.id
+            y = open("config.json", "w")
+            json.dump(configuration, y)
+            y.close()
+            x.close()
+            x = open("config.json", "r")
+            configuration = json.load(x)
+            x.close()
+            await ctx.send("Channel set.")
+            break
+    elif channel_id:
+        configuration['LevelLogChannel'] = channel_id
+        y = open("config.json", "w")
+        json.dump(configuration, y)
+        y.close()
+        x.close()
+        x = open("config.json", "r")
+        configuration = json.load(x)
+        x.close()
+        await ctx.send("Channel set.")
+    else:
+        await ctx.send("No channel was mentioned and no ID was provided.")
 
 
 @bot.command()
