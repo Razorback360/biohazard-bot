@@ -74,9 +74,8 @@ async def on_message(message):
             try:
                 user = await AFK.get(user_id=x.id)
                 await message.channel.send(f"{x.display_name} is AFK: {user.message}")
-                return
             except DoesNotExist:
-                return
+                pass
     await bot.process_commands(message)
 
 
@@ -242,7 +241,8 @@ async def generate(ctx, bin):
             pass
     card = ""
     for cc in final:
-        card = card + f"{cc}\n"
+        data = utils.cvv_date()
+        card = card + f"{cc} | {data['cvv']} | {data['date']}\n"
     await ctx.send(f"Here are 5 validated credit card numbers:\n{card}")
 
 
@@ -259,22 +259,24 @@ async def validate(ctx, CC):
 @bot.command()
 @commands.cooldown(1, 10, commands.BucketType.user)
 async def whois(ctx):
+    print("test")
     if ctx.message.mentions:
+        print("test")
         for x in ctx.message.mentions:
             duration = datetime.datetime.now() - x.joined_at
-
+            print("test")
             hours, remainder = divmod(int(duration .total_seconds()), 3600)
             minutes, seconds = divmod(remainder, 60)
             days, hours = divmod(hours, 24)
-
+            print("test")
             created_at = datetime.datetime.now() - x.created_at
-
+            print("test")
             created_athours, created_atremainder = divmod(int(created_at .total_seconds()), 3600)
             created_atminutes, created_atseconds = divmod(created_atremainder, 60)
             created_atdays, created_athours = divmod(created_athours, 24)
 
             roles = str([y.mention for y in x.roles]).replace('[', '').replace(']', '').replace('\'', '')
-
+            print("test")
             embed = discord.Embed(title="User Info", description=f"Here is <@{x.id}> profile details.")
             embed.set_thumbnail(url=x.avatar_url)
             embed.add_field(name="Id", value=x.id)
@@ -285,16 +287,20 @@ async def whois(ctx):
             embed.add_field(name="Roles", value=roles)
             embed.add_field(name="Account Age", value=f"{created_atdays} days, {created_athours} hours")
             embed.add_field(name="Join Age", value=f"{days} days, {hours} hours")
-
+            print("test")
             await ctx.send(embed=embed)
+            print("test")
     else:
+        print("test")
         user = ctx.message.author.id
         x = ctx.guild.get_member(user_id=user)
         duration = datetime.datetime.now() - x.joined_at
+        print("test")
 
         hours, remainder = divmod(int(duration .total_seconds()), 3600)
         minutes, seconds = divmod(remainder, 60)
         days, hours = divmod(hours, 24)
+        print("test")
 
         created_at = datetime.datetime.now() - x.created_at
         created_athours, created_atremainder = divmod(int(created_at .total_seconds()), 3600)
@@ -302,6 +308,7 @@ async def whois(ctx):
         created_atdays, created_athours = divmod(created_athours, 24)
 
         roles = str([y.mention for y in x.roles]).replace('[', '').replace(']', '').replace('\'', '')
+        print("test")
 
         embed = discord.Embed(title="User Info", description=f"Here is <@{x.id}> profile details.")
         embed.set_thumbnail(url=x.avatar_url)
@@ -313,6 +320,7 @@ async def whois(ctx):
         embed.add_field(name="Roles", value=roles)
         embed.add_field(name="Account Age", value=f"{created_atdays} days, {created_athours} hours")
         embed.add_field(name="Join Age", value=f"{days} days, {hours} hours")
+        print("test")
 
         await ctx.send(embed=embed)
 

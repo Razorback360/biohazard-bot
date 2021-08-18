@@ -1,4 +1,5 @@
 import random
+import datetime
 
  # IIN For Banking Industry(6 digits)
 def luhn(num):
@@ -20,3 +21,15 @@ def luhn(num):
     card_num = [str(i) for i in card_num]
     return ''.join(card_num)
 
+
+def cvv_date():
+    minimum = 0
+    maximum = 9
+    cvv = f"{random.randint(minimum, maximum)}{random.randint(minimum, maximum)}{random.randint(minimum, maximum)}"
+    now = int(datetime.datetime.now().strftime("%y"))
+    new_min = now
+    new_max = now + 10
+    month_min = 1
+    month_max = 12
+    date = f"{str(random.randint(month_min, month_max)).rjust(2, '0')}/{random.randint(new_min, new_max)}"
+    return {"cvv": cvv, "date": date}
