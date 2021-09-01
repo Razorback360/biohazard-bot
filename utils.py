@@ -1,6 +1,6 @@
 import random
 import datetime
-
+import os
  # IIN For Banking Industry(6 digits)
 def luhn(num):
     card_no = [int(i) for i in str(num)]  # To find the checksum digit on
@@ -42,3 +42,8 @@ def cvv_date():
         date = f"{str(random.randint(month_min, month_max)).rjust(2, '0')}/{year}"
 
     return {"cvv": cvv, "date": date}
+
+
+def clean_dir(dir):
+    for i in os.listdir(dir):
+        os.remove(f"{dir}/{i}")

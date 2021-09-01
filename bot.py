@@ -6,8 +6,8 @@
 #######################################################################
 
 import discord
+from discord import permissions
 from discord.ext import commands
-from discord.ext.commands import MissingPermissions
 import json
 import string
 import random
@@ -18,7 +18,7 @@ import luhn
 import os
 import json
 from tortoise import Tortoise
-from database import Levels, AFK, Submissions, RoleBlacklist
+from database import Levels, AFK, Submissions, RoleBlacklist, LevelRole, BackupMessages, BackupChannels, BackupRoles, BackupUsers
 from tortoise.exceptions import DoesNotExist
 import chat_exporter
 import io
@@ -43,10 +43,9 @@ async def on_ready():
         modules={'models': ['database']}
     )
     await Tortoise.generate_schemas()
-    
+
     chat_exporter.init_exporter(bot)
     print("Im online and ready!")
-
 
 
 @bot.event
@@ -130,6 +129,7 @@ async def add_experience(users, user, message):
 
 
 async def level_up(users, message):
+    guild = message.guild
     experience = users.experience
     lvl_start = users.level
     lvl_end = int(experience ** (1 / 3))
@@ -140,6 +140,13 @@ async def level_up(users, message):
             await channel.send(f':tada: <@{users.user_id}> has reached level {lvl_end}. Congrats! :tada:')
         else:
             await message.channel.send(f':tada: <@{users.user_id}> has reached level {lvl_end}. Congrats! :tada:')
+        try:
+            role = await LevelRole.get(level=lvl_end)
+            member = guild.get_member(users.user_id)
+            roletoadd = guild.get_role(role.role_id)
+            await member.add_roles(roletoadd)
+        except DoesNotExist:
+            pass
         await Levels.filter(user_id=message.author.id).update(level=lvl_end)
 
 
@@ -191,7 +198,6 @@ async def add(ctx, title, link, description):
         await Submissions(user_id=ctx.message.author.id, title=title, link=link, description=description, unique_id=UniqueID).save()
 
 
-
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def approve(ctx, UniqueID, ChannelID):
@@ -200,7 +206,7 @@ async def approve(ctx, UniqueID, ChannelID):
     except DoesNotExist:
         await ctx.send("The ID provided is not a valid one. Please provide a valid ID.")
         return
-    
+
     channel = bot.get_channel(int(ChannelID))
     if data.link:
         ApprovedSub = discord.Embed(
@@ -221,7 +227,7 @@ async def approve(ctx, UniqueID, ChannelID):
         await ctx.send("Approved!")
         await Submissions.filter(unique_id=UniqueID).delete()
         return
-    
+
 
 @bot.command()
 @commands.has_permissions(administrator=True)
@@ -231,7 +237,7 @@ async def deny(ctx, UniqueID):
     except DoesNotExist:
         await ctx.send("The ID provided is not a valid one. Please provide a valid ID.")
         return
-    
+
     await Submissions.filter(unique_id=UniqueID).delete()
     await ctx.send("Denied!")
 
@@ -386,10 +392,9 @@ async def unafk(ctx):
     except DoesNotExist:
         await ctx.send("You weren't AFK.")
         return
-    
+
     await AFK.filter(user_id=ctx.message.author.id).delete()
     await ctx.send("You are no longer AFK.")
-
 
 
 @bot.command()
@@ -423,8 +428,8 @@ async def close_ticket(ctx):
     if transcript is None:
         return
 
-    transcript_file = discord.File(io.BytesIO(transcript.encode()),filename=f"transcript-{ctx.channel.name}.html")
-    
+    transcript_file = discord.File(io.BytesIO(transcript.encode()), filename=f"transcript-{ctx.channel.name}.html")
+
     await log.send(file=transcript_file)
     await ctx.channel.delete()
 
@@ -440,10 +445,11 @@ async def blacklist(ctx, role_id: Optional[int]):
         if ctx.guild.get_role(role_id):
             await RoleBlacklist(role_id=role_id).save()
             await ctx.send("Role blacklisted.")
-        else: 
+        else:
             await ctx.send("Invalid role id")
     else:
         await ctx.send("No role was mentioned or no role_id was provided.")
+
 
 @bot.command()
 @commands.has_permissions(administrator=True)
@@ -500,6 +506,181 @@ async def set_level_channel(ctx, channel_id: Optional[int]):
 
 
 @bot.command()
+@commands.has_permissions(administrator=True)
+async def addlevelrole(ctx, level, role_id: Optional[int]):
+    if level:
+        if ctx.message.role_mentions:
+            for role in ctx.message.role_mentions:
+                await LevelRole(role_id=role.id, level=level).save()
+                await ctx.send("Level role added.")
+        elif role_id:
+            if ctx.guild.get_role(role_id):
+                await LevelRole(role_id=role_id, level=level).save()
+                await ctx.send("Level role added.")
+            else:
+                await ctx.send("Invalid role id")
+        else:
+            await ctx.send("No role was mentioned or no role_id was provided.")
+    else:
+        await ctx.send("No level was provided.")
+
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def backup_messages_channels(ctx):
+    channels = ctx.guild.channels
+    await BackupChannels().all().delete()
+    await BackupMessages().all().delete()
+    utils.clean_dir("attachment_backup")
+    n = 1
+    for channel in channels:
+        jsonVar1 = []
+        for overwrite in channel.overwrites:
+            if isinstance(overwrite, discord.member.Member):
+                continue
+            else:
+                jsonVar1.append({"role": overwrite.name, "permissions": {
+                        permission[0]: permission[1] for permission in overwrite.permissions}})
+        chann_type = None
+        if type(channel) == discord.TextChannel:
+            chann_type = "text"
+        elif type(channel) == discord.StageChannel:
+            chann_type = "stage"
+        elif type(channel) == discord.VoiceChannel:
+            chann_type = "voice"
+        else:
+            continue
+
+        if chann_type == "stage" or chann_type == "voice":
+            await BackupChannels(name=channel.name, type=chann_type, category=channel.category.name, category_position=channel.category.position, channel_position=channel.position, roles=json.dumps(jsonVar1)).save()
+            continue
+
+        await BackupChannels(name=channel.name, type=chann_type, category=channel.category.name, category_position=channel.category.position, channel_position=channel.position, roles=json.dumps(jsonVar1)).save()
+        data = await channel.history(limit=None).flatten()
+        for message in data:
+            if message.attachments:
+                for attachment in message.attachments:
+                    if os.path.exists(f"attachment_backup/{attachment.filename}"):
+                        path = f"attachment_backup/{n}{attachment.filename}"
+                        await attachment.save(f"attachment_backup/{n}{attachment.filename}")
+                        n += 1
+                    else:
+                        path = f"attachment_backup/{attachment.filename}"
+                        await attachment.save(f"attachment_backup/{attachment.filename}")
+                    await BackupMessages(user_id=message.author.id, message=message.clean_content, channel=message.channel.name, date_time=message.created_at, attachment=path).save()
+                    print("end of attachment")
+            elif message.embeds:
+                for embed in message.embeds:
+                    await BackupMessages(user_id=message.author.id, message=message.clean_content, channel=message.channel.name, date_time=message.created_at, embed=json.dumps(embed.to_dict())).save()
+            else:
+                await BackupMessages(user_id=message.author.id, message=message.clean_content, channel=message.channel.name, date_time=message.created_at).save()
+    await ctx.send(f"Backup done <@{ctx.author.id}>.")
+
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def backup_users(ctx):
+    roles = ctx.guild.roles
+    members = ctx.guild.members
+
+    jsonVar = []
+    for role in roles:
+        jsonVar.append({"role": role.name, "permissions": {
+                       permission[0]: permission[1] for permission in role.permissions}, "color": role.color.value, "position": role.position})
+    print(jsonVar)
+    for role in jsonVar:
+        await BackupRoles(rolename=role['role'], permissisons=json.dumps(role['permissions']), color=role['color'], position=role['position']).save()
+    print("here")
+    for member in members:
+        listRoles = []
+        for role in member.roles:
+            listRoles.append(role.name)
+        await BackupUsers(user_id=member.id, roles=listRoles).save()
+    print("now here")
+
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def startrestore(ctx):
+    channels = await BackupChannels().all().values()
+    messages = await BackupMessages().all().values()
+    roles = await BackupRoles().all().values()
+
+    guild = ctx.guild
+
+    roleposdict = {}
+    
+    for role in roles:
+        permissions = json.loads(role['permissisons'])
+        print(permissions)
+        permissions = discord.Permissions(**permissions)
+        print(permissions)
+        roleobject = await guild.create_role(name=role['rolename'], permissions=permissions, colour=int(role['color']))
+        roleposdict[roleobject if role['rolename'] != "@everyone" else guild.default_role] = role['position']
+    
+    await guild.edit_role_positions(roleposdict)
+
+    print(channels)
+    for channel in channels:
+        category = discord.utils.get(guild.categories, name=channel['category'])
+        roledict = {}
+        for role in json.loads(channel['roles']):
+            roleobj = discord.utils.get(guild.roles, name=role['role'])
+            permissions = role['permissions']
+            if roleobj:
+                roledict[roleobj] = discord.PermissionOverwrite(**permissions)
+        if category:
+            pass
+        else:
+            category = await guild.create_category_channel(name=channel['category'], position=channel['category_position'])
+        if channel['type'] == "voice":
+            await category.create_voice_channel(name=channel['name'], position=channel['channel_position'], overwrites=roledict)
+        elif channel['type'] == "stage":
+            await category.create_stage_channel(name=channel['name'], position=channel['channel_position'], overwrites=roledict)
+        else:
+            await category.create_text_channel(name=channel['name'], position=channel['channel_position'], overwrites=roledict)
+    
+    messages = sorted(messages, key=lambda x: datetime.datetime.strftime(x['date_time'], "%m-%d-%Y %H:%M:%S.%f"))
+    for message in messages:
+        channel = discord.utils.get(ctx.guild.channels, name=message['channel'])
+        hooks = await channel.webhooks()
+        user = bot.get_user(message['user_id'])
+        if message['embed']:
+            print(type(json.loads(message['embed'])))
+        else:
+            print(None)
+        if message['message']:
+            if hooks:
+                hook = hooks[0]
+                await hook.send(content=message['message'], username=user.display_name if user else "invalid_user",
+                                avatar_url=user.avatar_url if user else None, file=discord.File(message['attachment'], message['attachment']) if message['attachment'] else None, embed=discord.Embed.from_dict(json.loads(message['embed'])) if message['embed'] else None)
+            else:
+                hook = await channel.create_webhook(name="mywebhook")
+                await hook.send(content=message['message'], username=user.display_name if user else "invalid_user",
+                                avatar_url=user.avatar_url if user else None, file=discord.File(message['attachment'], message['attachment']) if message['attachment'] else None, embed=discord.Embed.from_dict(json.loads(message['embed'])) if message['embed'] else None)
+        elif message['attachment']:
+            if hooks:
+                hook = hooks[0]
+                await hook.send(content=None, username=user.display_name if user else "invalid_user",
+                                avatar_url=user.avatar_url if user else None, file=discord.File(message['attachment'], message['attachment']) if message['attachment'] else None, embed=discord.Embed.from_dict(json.loads(message['embed'])) if message['embed'] else None)
+            else:
+                hook = await channel.create_webhook(name="mywebhook")
+                await hook.send(content=None, username=user.display_name if user else "invalid_user",
+                                avatar_url=user.avatar_url if user else None, file=discord.File(message['attachment'], message['attachment']) if message['attachment'] else None, embed=discord.Embed.from_dict(json.loads(message['embed'])) if message['embed'] else None)
+        elif message['embed']:
+            if hooks:
+                hook = hooks[0]
+                await hook.send(content=None, username=user.display_name if user else "invalid_user",
+                                avatar_url=user.avatar_url if user else None, file=discord.File(message['attachment'], message['attachment']) if message['attachment'] else None, embed=discord.Embed.from_dict(json.loads(message['embed'])) if message['embed'] else None)
+            else:
+                hook = await channel.create_webhook(name="mywebhook")
+                await hook.send(content=None, username=user.display_name if user else "invalid_user",
+                                avatar_url=user.avatar_url if user else None, file=discord.File(message['attachment'], message['attachment']) if message['attachment'] else None, embed=discord.Embed.from_dict(json.loads(message['embed'])) if message['embed'] else None)
+
+    await ctx.send(f"Backup done <@{ctx.author.id}>.")
+
+
+@bot.command()
 async def help(ctx):
     helpEmbed = discord.Embed(title="Help!", description="These are the available commands!", color=0x77c128)
     helpEmbed.add_field(
@@ -526,7 +707,7 @@ async def help(ctx):
 @whois.error
 @level.error
 async def permissions_error(ctx, error):
-    if isinstance(error, MissingPermissions):
+    if isinstance(error, commands.MissingPermissions):
         await ctx.send(error)
         return
     if isinstance(error, commands.CommandOnCooldown):
