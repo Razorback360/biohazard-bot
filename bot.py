@@ -7,6 +7,7 @@
 
 import discord
 from discord import permissions
+from discord import emoji
 from discord.ext import commands
 import json
 import string
@@ -18,10 +19,11 @@ import luhn
 import os
 import json
 from tortoise import Tortoise
-from database import Levels, AFK, Submissions, RoleBlacklist, LevelRole, BackupMessages, BackupChannels, BackupRoles, BackupUsers
+from database import Levels, AFK, Submissions, RoleBlacklist, LevelRole, BackupMessages, BackupChannels, BackupRoles, BackupUsers, ReactionChannels
 from tortoise.exceptions import DoesNotExist
 import chat_exporter
 import io
+import discapty
 
 x = open("config.json", "r")
 configuration = json.load(x)
@@ -62,27 +64,39 @@ async def on_member_join(member):
 
 @bot.event
 async def on_message(message):
-    if message.author.bot == False:
-        for role in message.author.roles:
+    if message.guild:
+        if message.author.bot == False:
+            for role in message.author.roles:
+                try:
+                    await RoleBlacklist.get(role_id=role.id)
+                    await bot.process_commands(message)
+                    return
+                except DoesNotExist:
+                    pass
+                    continue
             try:
-                await RoleBlacklist.get(role_id=role.id)
-                await bot.process_commands(message)
-                return
+                user = await Levels.get(user_id=message.author.id)
+                await add_experience(user, message.author, message)
             except DoesNotExist:
-                pass
-                continue
+                await add_experience(None, message.author, message)
+        if message.mentions:
+            for x in message.mentions:
+                try:
+                    user = await AFK.get(user_id=x.id)
+                    await message.channel.send(f"{x.display_name} is AFK: {user.message}")
+                except DoesNotExist:
+                    pass
         try:
-            user = await Levels.get(user_id=message.author.id)
-            await add_experience(user, message.author, message)
+            channel_reactions = await ReactionChannels.get(channel_id=message.channel.id)
+            channel_reactions = await ReactionChannels.get(channel_id=message.channel.id).values()
+            print(channel_reactions)
+            for channel in channel_reactions:
+                reactions = json.loads(channel['reactions'])
+            for reaction in reactions:
+                emoji = discord.utils.get(bot.emojis, name=reaction)
+                await message.add_reaction(emoji if emoji else reaction)
         except DoesNotExist:
-            await add_experience(None, message.author, message)
-    if message.mentions:
-        for x in message.mentions:
-            try:
-                user = await AFK.get(user_id=x.id)
-                await message.channel.send(f"{x.display_name} is AFK: {user.message}")
-            except DoesNotExist:
-                pass
+            pass
     await bot.process_commands(message)
 
 
@@ -679,6 +693,104 @@ async def startrestore(ctx):
 
     await ctx.send(f"Backup done <@{ctx.author.id}>.")
 
+@bot.command()
+async def verified_role(ctx, role_id: Optional[int]):
+    global configuration
+    global x
+    if ctx.message.role_mentions:
+        for role in ctx.message.role_mentions:
+            configuration['VerifiedRole'] = role.id
+            y = open("config.json", "w")
+            json.dump(configuration, y)
+            y.close()
+            x.close()
+            x = open("config.json", "r")
+            configuration = json.load(x)
+            x.close()
+            await ctx.send("Verified role set.")
+            break
+    elif role_id:
+        configuration['VerifiedRole'] = role_id
+        y = open("config.json", "w")
+        json.dump(configuration, y)
+        y.close()
+        x.close()
+        x = open("config.json", "r")
+        configuration = json.load(x)
+        x.close()
+        await ctx.send("Verified role set.")
+    else:
+        await ctx.send("No role was mentioned and no ID was provided.")
+
+@bot.command()
+async def verify(ctx):
+    if 'VerifiedRole' in configuration:
+        role = ctx.guild.get_role(int(configuration['VerifiedRole']))
+        captcha = discapty.Captcha("wheezy")
+        captcha_image = discord.File(captcha.generate_captcha(), filename="captcha.png")
+        await ctx.message.author.send("This captcha is Case Sensitive. You have 30 seconds to solve the captcha. IF incorrect go back to server and request a new one.",file=captcha_image)
+        await ctx.send("I have sent a captcha to your DMs.")
+
+        def check(message):
+            return message.channel.type == discord.ChannelType.private and message.author == ctx.message.author
+
+        message = await bot.wait_for("message", timeout = 30, check=check)
+
+        print(message.content)
+        print(type(message))
+        print(captcha.verify_code(message.content))
+
+        if captcha.verify_code(message.content):
+            await ctx.message.author.send("You are now verified.")
+            await ctx.message.author.add_roles(role)
+        else:
+            await ctx.message.author.send("Incorrect. Please return to the server and initiate the verification process again.")
+    else:
+        await ctx.send("Please contact adminstration to setup verification.")
+
+@bot.command()
+async def add_reaction(ctx, channel_id: Optional[int]):
+    channel_id_message= None
+    if ctx.message.channel_mentions:
+        for channel in ctx.message.channel_mentions:
+            channel_id_message = channel.id
+            break
+    elif channel_id:
+        pass
+    else:
+        await ctx.send("No channel was mentioned and no ID was provided.")
+        return
+    
+    await ctx.send("React with the emoji you want to add.")
+    
+    def check(reaction, user):
+        return user == ctx.message.author
+
+    data = await bot.wait_for("reaction_add", timeout=30, check=check)
+
+    try:
+        emoji = data[0].emoji.name
+    except:
+        emoji = str(data[0])
+        print(emoji)
+    try:
+        reactionsobj = await ReactionChannels.get(channel_id=channel_id_message if channel_id_message else channel_id)
+        reactions = await ReactionChannels.get(channel_id=channel_id_message if channel_id_message else channel_id).values()
+        for reaction in reactions:
+            newreactions = json.loads(reaction['reactions'])
+        for stuff in newreactions:
+            if stuff == emoji:
+                await ctx.send("Reaction already present.")
+                return
+            else:
+                continue
+        newreactions.append(emoji)
+        print(newreactions)
+        await ReactionChannels.filter(channel_id=channel_id_message if channel_id_message else channel_id).update(reactions=json.dumps(newreactions))
+    except DoesNotExist:
+        await ReactionChannels(channel_id=channel_id_message if channel_id_message else channel_id, reactions=json.dumps([emoji])).save()
+        
+    await ctx.send(f"Bot will now react with emoji {emoji} in channel <#{channel_id_message if channel_id_message else channel_id}>")
 
 @bot.command()
 async def help(ctx):

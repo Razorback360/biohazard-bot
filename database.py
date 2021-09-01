@@ -91,3 +91,11 @@ class BackupRoles(Model):
     permissisons = fields.TextField(null=False)
     position = fields.IntField(null=True)
     color = fields.TextField(null=True)
+
+
+class ReactionChannels(Model):
+    class Meta:
+        table = "reactionchannels"
+    id = fields.IntField(pk=True, null=False, generated=True)
+    channel_id = fields.IntField(null=False)
+    reactions = fields.TextField(null=False)
