@@ -150,15 +150,19 @@ async def set_log_channel(ctx, channel_id: Optional[int]):
             await ctx.send("Channel set.")
             break
     elif channel_id:
-        configuration['LogChannel'] = channel_id
-        y = open("config.json", "w")
-        json.dump(configuration, y)
-        y.close()
-        x.close()
-        x = open("config.json", "r")
-        configuration = json.load(x)
-        x.close()
-        await ctx.send("Channel set.")
+        channel = bot.get_channel(channel_id)
+        if channel:
+            configuration['LogChannel'] = channel_id
+            y = open("config.json", "w")
+            json.dump(configuration, y)
+            y.close()
+            x.close()
+            x = open("config.json", "r")
+            configuration = json.load(x)
+            x.close()
+            await ctx.send("Channel set.")
+        else:
+            await ctx.send("Invalid ID.")
     else:
         await ctx.send("No channel was mentioned and no ID was provided.")
 
@@ -542,15 +546,20 @@ async def set_submission_channel(ctx, channel_id: Optional[int]):
             await ctx.send("Channel set.")
             break
     elif channel_id:
-        configuration['SubmissionChannel'] = channel_id
-        y = open("config.json", "w")
-        json.dump(configuration, y)
-        y.close()
-        x.close()
-        x = open("config.json", "r")
-        configuration = json.load(x)
-        x.close()
-        await ctx.send("Channel set.")
+        channel = bot.get_channel(channel_id)
+        if channel:
+            configuration['SubmissionChannel'] = channel_id
+            y = open("config.json", "w")
+            json.dump(configuration, y)
+            y.close()
+            x.close()
+            x = open("config.json", "r")
+            configuration = json.load(x)
+            x.close()
+            await ctx.send("Channel set.")
+        else:
+            await ctx.send("Invalid ID.")
+            return
     else:
         await ctx.send("No channel was mentioned and no ID was provided.")
 
@@ -819,6 +828,12 @@ async def add_reaction(ctx, channel_id: Optional[int]):
             channel_id_message = channel.id
             break
     elif channel_id:
+        channel = bot.get_channel(channel_id)
+        if channel:
+            pass
+        else:
+            await ctx.send("Invalid ID")
+            return
         pass
     else:
         await ctx.send("No channel was mentioned and no ID was provided.")
@@ -863,6 +878,12 @@ async def stop_reactions(ctx, channel_id: Optional[int]):
             channel_id_message = channel.id
             break
     elif channel_id:
+        channel = bot.get_channel(channel_id)
+        if channel:
+            pass
+        else:
+            await ctx.send("Invalid ID.")
+            return
         pass
     else:
         await ctx.send("No channel was mentioned and no channel ID was provided.")
@@ -902,15 +923,19 @@ async def set_verified_role(ctx, role_id: Optional[int]):
             await ctx.send("Verified role set.")
             break
     elif role_id:
-        configuration['VerifiedRole'] = role_id
-        y = open("config.json", "w")
-        json.dump(configuration, y)
-        y.close()
-        x.close()
-        x = open("config.json", "r")
-        configuration = json.load(x)
-        x.close()
-        await ctx.send("Verified role set.")
+        if ctx.guild.get_role(role_id):
+            configuration['VerifiedRole'] = role_id
+            y = open("config.json", "w")
+            json.dump(configuration, y)
+            y.close()
+            x.close()
+            x = open("config.json", "r")
+            configuration = json.load(x)
+            x.close()
+            await ctx.send("Verified role set.")
+        else:
+            await ctx.send("Invalid ID.")
+            return
     else:
         await ctx.send("No role was mentioned and no ID was provided.")
 
@@ -1061,13 +1086,17 @@ async def blacklist(ctx, role_id: Optional[int]):
 @commands.has_permissions(manage_roles=True)
 async def unblacklist(ctx, role_id: Optional[int]):
     if role_id:
-        try:
-            await RoleBlacklist.get(role_id=role_id)
-            await RoleBlacklist.filter(role_id=role_id).delete()
+        if ctx.guild.get_role(role_id):    
+            try:
+                await RoleBlacklist.get(role_id=role_id)
+                await RoleBlacklist.filter(role_id=role_id).delete()
+                await ctx.send("Role unblacklisted.")
+            except:
+                await ctx.send("Provided role_id is not in the DB.")
+                return
             await ctx.send("Role unblacklisted.")
-        except:
-            await ctx.send("Provided role_id is inavlid or not in the DB.")
-        await ctx.send("Role blacklisted.")
+        else:
+            await ctx.send("Invalid ID.")
     elif ctx.message.role_mentions:
         for role in ctx.message.role_mentions:
             try:
@@ -1098,15 +1127,19 @@ async def set_level_channel(ctx, channel_id: Optional[int]):
             await ctx.send("Channel set.")
             break
     elif channel_id:
-        configuration['LevelLogChannel'] = channel_id
-        y = open("config.json", "w")
-        json.dump(configuration, y)
-        y.close()
-        x.close()
-        x = open("config.json", "r")
-        configuration = json.load(x)
-        x.close()
-        await ctx.send("Channel set.")
+        channel = bot.get_channel(channel_id)
+        if channel:
+            configuration['LevelLogChannel'] = channel_id
+            y = open("config.json", "w")
+            json.dump(configuration, y)
+            y.close()
+            x.close()
+            x = open("config.json", "r")
+            configuration = json.load(x)
+            x.close()
+            await ctx.send("Channel set.")
+        else:
+            await ctx.send("Invalid ID.")
     else:
         await ctx.send("No channel was mentioned and no ID was provided.")
 
