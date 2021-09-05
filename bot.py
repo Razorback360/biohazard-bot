@@ -786,16 +786,10 @@ async def restore(ctx):
             await category.create_text_channel(name=channel['name'], position=channel['channel_position'], overwrites=roledict)
 
     messages = sorted(messages, key=lambda x: datetime.datetime.strftime(x['date_time'], "%m-%d-%Y %H:%M:%S.%f"))
-    print(messages)
     for message in messages:
         channel = discord.utils.get(ctx.guild.channels, name=message['channel'])
         hooks = await channel.webhooks()
         user = bot.get_user(message['user_id'])
-        print(message)
-        print(message['message'])
-        if message['message']:
-            print(True)
-            print(message['message'])
         if hooks:
             hook = hooks[0]
             try:
