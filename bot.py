@@ -171,10 +171,6 @@ async def set_log_channel(ctx, channel_id: Optional[int]):
 async def set_min_age(ctx, age: int):
     global configuration
     global x
-    embed = discord.Embed(name="Create Ticket", description="React with :e_mail: to create a ticket")
-    channel = ctx.message.channel.id
-    message = await ctx.send(embed=embed)
-    await message.add_reaction("📧")
     configuration['Age'] = age
     y = open("config.json", "w")
     json.dump(configuration, y)
@@ -189,8 +185,38 @@ async def set_min_age(ctx, age: int):
 @bot.command()
 @commands.cooldown(1, 10, commands.BucketType.user)
 async def whois(ctx):
-    if ctx.message.mentions:
-        for x in ctx.message.mentions:
+    try:
+        if ctx.message.mentions:
+            for x in ctx.message.mentions:
+                duration = datetime.datetime.now() - x.joined_at
+                hours, remainder = divmod(int(duration .total_seconds()), 3600)
+                minutes, seconds = divmod(remainder, 60)
+                days, hours = divmod(hours, 24)
+
+                created_at = datetime.datetime.now() - x.created_at
+                created_athours, created_atremainder = divmod(int(created_at .total_seconds()), 3600)
+                created_atminutes, created_atseconds = divmod(created_atremainder, 60)
+                created_atdays, created_athours = divmod(created_athours, 24)
+
+                roles = str([y.mention for y in x.roles]).replace('[', '').replace(']', '').replace('\'', '')
+
+                embed = discord.Embed(title="User Info", description=f"Here is <@{x.id}> profile details.", color=0xFF5733)
+                embed.set_thumbnail(url=x.avatar_url)
+                embed.add_field(name="Id", value=x.id)
+                embed.add_field(name="Created At", value=x.created_at.strftime('%d, %b %Y'))
+                embed.add_field(name="Joined At", value=x.joined_at.strftime('%d, %b %Y'))
+                embed.add_field(name="Display Name", value=x.display_name)
+                embed.add_field(name="Avatar", value=f"[Link]({x.avatar_url})")
+                embed.add_field(name="Roles", value=roles)
+                embed.add_field(name="Account Age", value=f"{created_atdays} days, {created_athours} hours")
+                embed.add_field(name="Join Age", value=f"{days} days, {hours} hours")
+
+                await ctx.send(embed=embed)
+        else:
+
+            user = ctx.message.author.id
+            x = ctx.guild.get_member(user_id=user)
+
             duration = datetime.datetime.now() - x.joined_at
             hours, remainder = divmod(int(duration .total_seconds()), 3600)
             minutes, seconds = divmod(remainder, 60)
@@ -203,7 +229,7 @@ async def whois(ctx):
 
             roles = str([y.mention for y in x.roles]).replace('[', '').replace(']', '').replace('\'', '')
 
-            embed = discord.Embed(title="User Info", description=f"Here is <@{x.id}> profile details.")
+            embed = discord.Embed(title="User Info", description=f"Here is <@{x.id}> profile details.", color=0xFF5733)
             embed.set_thumbnail(url=x.avatar_url)
             embed.add_field(name="Id", value=x.id)
             embed.add_field(name="Created At", value=x.created_at.strftime('%d, %b %Y'))
@@ -215,35 +241,8 @@ async def whois(ctx):
             embed.add_field(name="Join Age", value=f"{days} days, {hours} hours")
 
             await ctx.send(embed=embed)
-    else:
-
-        user = ctx.message.author.id
-        x = ctx.guild.get_member(user_id=user)
-
-        duration = datetime.datetime.now() - x.joined_at
-        hours, remainder = divmod(int(duration .total_seconds()), 3600)
-        minutes, seconds = divmod(remainder, 60)
-        days, hours = divmod(hours, 24)
-
-        created_at = datetime.datetime.now() - x.created_at
-        created_athours, created_atremainder = divmod(int(created_at .total_seconds()), 3600)
-        created_atminutes, created_atseconds = divmod(created_atremainder, 60)
-        created_atdays, created_athours = divmod(created_athours, 24)
-
-        roles = str([y.mention for y in x.roles]).replace('[', '').replace(']', '').replace('\'', '')
-
-        embed = discord.Embed(title="User Info", description=f"Here is <@{x.id}> profile details.")
-        embed.set_thumbnail(url=x.avatar_url)
-        embed.add_field(name="Id", value=x.id)
-        embed.add_field(name="Created At", value=x.created_at.strftime('%d, %b %Y'))
-        embed.add_field(name="Joined At", value=x.joined_at.strftime('%d, %b %Y'))
-        embed.add_field(name="Display Name", value=x.display_name)
-        embed.add_field(name="Avatar", value=f"[Link]({x.avatar_url})")
-        embed.add_field(name="Roles", value=roles)
-        embed.add_field(name="Account Age", value=f"{created_atdays} days, {created_athours} hours")
-        embed.add_field(name="Join Age", value=f"{days} days, {hours} hours")
-
-        await ctx.send(embed=embed)
+    except:
+        await ctx.send("User not found.")
 
 
 @bot.command()
@@ -270,177 +269,206 @@ async def unafk(ctx):
 async def help(ctx, command: Optional[str]):
     list_of_commands = [
 
-        {"command": "add", "value": "'[title]' '[link]' '[description]'\nMust have double quotes as shown."},
-        {"command": "level", "value": "<mention> or <user id> or nothing."},
-        {"command": "leaderboard", "value": "No arguments."},
-        {"command": "generate", "value": "[6 character bin]"},
-        {"command": "validate", "value": "[card number]."},
-        {"command": "afk", "value": "[afk message]."},
-        {"command": "unafk", "value": "No arguments."},
-        {"command": "whois", "value": "<mention> or nothing."},
-        {"command": "verify", "value": "No arguments."},
-        {"command": "close_ticket", "value": "No arguments.\nMust be used in ticket that is being closed."},
-        {"command": "backup", "value": "No arguments.\nRequires adminstrator permission."},
-        {"command": "restore", "value": "No arguments.\nRequires adminstrator permission."},
+        {"command": "add", "value": f"'[title]' '[link]' '[description]'\nMust have double quotes as shown.\n\n**Example: ?add 'Bin' 'https://test.url' 'Bin: 123456xxxx, Country: US'**"},
+        {"command": "level", "value": f"<mention> or <user id> or nothing. \n\n**Example: {configuration['Prefixes'][0]}level or 12321321321 or <@{ctx.message.author.id}>**"},
+        {"command": "leaderboard", "value": f"No arguments.\n\n**Example: {configuration['Prefixes'][0]}leaderboard**"},
+        {"command": "generate", "value": f"[6 character bin]\n\n**Example: {configuration['Prefixes'][0]}generate 123456**"},
+        {"command": "validate", "value": f"[card number].\n\n**Example: {configuration['Prefixes'][0]}validate 12341234567890**"},
+        {"command": "afk", "value": f"[afk message].\n\n**Example: {configuration['Prefixes'][0]}afk I'm going to sleep.**"},
+        {"command": "unafk", "value": f"No arguments.\n\n**Example: {configuration['Prefixes'][0]}unafk**"},
+        {"command": "whois", "value": f"<mention> or nothing. \n\n**Example: {configuration['Prefixes'][0]}whois or <@{ctx.message.author.id}>**"},
+        {"command": "verify", "value": f"No arguments."},
+        {"command": "close_ticket", "value": f"No arguments.\n**__Must be used in ticket that is being closed.__**\n\n**Example: {configuration['Prefixes'][0]}closeticket**"},
+        {"command": "backup", "value": f"No arguments.\nRequires adminstrator permission.\n\n**Example: {configuration['Prefixes'][0]}backup**"},
+        {"command": "restore", "value": f"No arguments.\nRequires adminstrator permission.\n\n**Example: {configuration['Prefixes'][0]}restore**"},
         {"command": "approve",
-         "value": "[unique id] [<channel id> or <channel mention>].\nRequires manage messages permission."},
-        {"command": "deny", "value": "[unique id].\nRequires manage messages permission."},
-        {"command": "kick", "value": "[<user id> or <user mention>].\nRequires kick members permission."},
-        {"command": "ban", "value": "[<user id> or <user mention>].\nRequires ban members permission."},
-        {"command": "set_min_age", "value": "[days].\nRequires adminstrator permission."},
-        {"command": "set_verified_role", "value": "[<role id> or <role mention>].\nRequires manage roles permission"},
+         "value": f"[unique id] [<channel id> or <channel mention>].\nRequires manage messages permission.\n\n**Example: {configuration['Prefixes'][0]}approve 3146257 12345673432 or #general**"},
+        {"command": "deny", "value": f"[unique id].\nRequires manage messages permission.\n\n**Example: {configuration['Prefixes'][0]}deny 121312341**"},
+        {"command": "kick", "value": f"[<user id> or <user mention>].\nRequires kick members permission.\n\n**Example: {configuration['Prefixes'][0]}kick 12143214312321321 or <@{ctx.message.author.id}>**"},
+        {"command": "ban", "value": f"[<user id> or <user mention>].\nRequires ban members permission.\n\n**Example: {configuration['Prefixes'][0]}ban 12123123214124123 or <@{ctx.message.author.id}>**"},
+        {"command": "set_min_age", "value": f"[days].\nRequires adminstrator permission.\n\n**Example: {configuration['Prefixes'][0]}set_min_age 7**"},
+        {"command": "set_verified_role", "value": f"[<role id> or <role mention>].\nRequires manage roles permission\n\n**Example: {configuration['Prefixes'][0]}set_verified_role 2134124123413421 or @role**"},
         {"command": "set_ticket",
          "value":
-         "[category id].\nMust be used in the channel where you want 'react to create ticket' to be.\nRequires manage channels and manage messages permissions."},
+         f"[category id].\n**__Must be used in the channel where you want 'react to create ticket' to be__**.\nRequires manage channels and manage messages permissions.\n\n**Example: {configuration['Prefixes'][0]}set_ticket_channel 1231242314321213**"},
         {"command": "set_log_channel",
-         "value": "[<channel id> or <channel mention].\nRequires manage channels permission"},
+         "value": f"[<channel id> or <channel mention].\nRequires manage channels permission\n\n**Example: {configuration['Prefixes'][0]}set_log_channel 21321421342141 or #general**"},
         {"command": "set_level_channel",
-         "value": "[<channel id> or <channel mention>].\nRequires manage channels permission"},
+         "value": f"[<channel id> or <channel mention>].\nRequires manage channels permission\n\n**Example: {configuration['Prefixes'][0]}set_level_channel 2314214231432141123 or #general**"},
         {"command": "add_reaction",
-         "value": "[<channel_id> or <channel mention>].\nRequires manage channels and manage messages permissions"},
+         "value": f"[<channel_id> or <channel mention>].\nRequires manage channels and manage messages permissions\n\n**Example: {configuration['Prefixes'][0]}add_reaction 213478963125489123 or #general**"},
         {"command": "add_level_role",
-         "value": "[level] [<role id> or <role mention>].\nRequires manage roles permission."},
-        {"command": "blacklist", "value": "[<role id> or <role mention>].\nRequires manage roles permission."},
-        {"command": "unblacklist", "value": "[<role id> or <role mention>].\nRequires manage roles permission."},
+         "value": f"[level] [<role id> or <role mention>].\nRequires manage roles permission.\n\n**Example: {configuration['Prefixes'][0]}add_level_role 5 1241234114331 or @role**"},
+        {"command": "blacklist", "value": f"[<role id> or <role mention>].\nRequires manage roles permission.\n\n**Example: {configuration['Prefixes'][0]}blacklist 2132143231423141 or @role**"},
+        {"command": "unblacklist", "value": f"[<role id> or <role mention>].\nRequires manage roles permission.\n\n**Example: {configuration['Prefixes'][0]}unblacklist 2142314513531423114 or @role**"},
         {"command": "stop_reactions",
-         "value": "[<channel id> or <channel mention>].\nRequires manage channels and manage messages permissions."},
+         "value": f"[<channel id> or <channel mention>].\nRequires manage channels and manage messages permissions.\n\n**Example: {configuration['Prefixes'][0]}stop_reactions 314231482301472314 or #general**"},
         {"command": "set_submission_channel",
-         "value": "[<channel id> or <channel mention].\nRequires manage channels permission"}]
+         "value": f"[<channel id> or <channel mention].\nRequires manage channels permission\n\n**Example: {configuration['Prefixes'][0]}set_submission_channel 214832017423014 or #general**"}]
 
     if command:
         for com in list_of_commands:
             if com["command"] == command:
                 value = com['value']
                 value = value.replace("'", '"')
-                embed1 = discord.Embed(title=command, description=f"{configuration['Prefixes'][0]}{command} {value}", color=0x77c128)
+                embed1 = discord.Embed(title=command, description=f"{configuration['Prefixes'][0]}{command} {value}", color=0xFF5733)
                 embed1.set_footer(text="Arguments between [] are required.\nArguments between <> are optional.\n[<> or <>] means it is required to use one.")
                 await ctx.send(embed=embed1)
                 return
-    
-    helpEmbed = discord.Embed(
-        title="Help!",
+    helpEmbedSubmissions = discord.Embed(
+        title="Help! (Submissions)",
         description=f"These are the available commands!\nType '{configuration['Prefixes'][0]}help [command name]' for more info about a command.",
-        color=0x77c128, inline=True
+        color=0xFF5733, inline=True
     )
-    helpEmbed.set_footer(text="Arguments between [] are required.\nArguments between <> are optional.\n[<> or <>] means it is required to use one.")
-    helpEmbed.add_field(
+    helpEmbedSubmissions.add_field(
         name=f'add',
         value="Adds a submission to the submission queue.",
     )
-    helpEmbed.add_field(
-        name=f'level',
-        value="Lists level and xp."
-    )
-    helpEmbed.add_field(
-        name=f'leaderboard',
-        value="Level leaderboard."
-    )
-    helpEmbed.add_field(
-        name=f'generate',
-        value="Generates CC. (Must be 6 chars)"
-    )
-    helpEmbed.add_field(
-        name=f'validate',
-        value="Validates a CC."
-    )
-    helpEmbed.add_field(
-        name=f'afk',
-        value="Sets user as AFK."
-    )
-    helpEmbed.add_field(
-        name=f'unafk',
-        value="Removes user AFK."
-    )
-    helpEmbed.add_field(
-        name=f'whois',
-        value="Sends user info."
-    )
-    helpEmbed.add_field(
-        name=f'verify',
-        value="Initiates a captcha verification."
-    )
-    helpEmbed.add_field(
-        name=f'close_ticket',
-        value="Closes a ticket."
-    )
-    helpEmbed2 = discord.Embed(
-        title="Help!",
-        description=f"These are the available commands!\nType '{configuration['Prefixes'][0]}help [command name] for more info about a command.",
-        color=0x77c128, inline=True
-    )
-    helpEmbed2.set_footer(text="Arguments between [] are required.\nArguments between <> are optional.\n[<> or <>] means it is required to use one.")
-    helpEmbed2.add_field(
-        name=f'backup',
-        value="Backup the server."
-    )
-    helpEmbed2.add_field(
-        name=f'restore',
-        value="Restore a backup."
-    )
-    helpEmbed2.add_field(
-        name=f'approve',
-        value="Approves a submission.",
-        inline=True)
-    helpEmbed2.add_field(
-        name=f'deny',
-        value="Denies a submission.",
-        inline=True)
-    helpEmbed2.add_field(
-        name=f'kick',
-        value="Kick a user."
-    )
-    helpEmbed2.add_field(
-        name=f'ban',
-        value="Ban a user."
-    )
-    helpEmbed2.add_field(
-        name=f'set_min_age',
-        value="Sets minimum age required to join server."
-    )
-    helpEmbed2.add_field(
-        name=f'set_verified_role',
-        value="Sets a role to be assigned when captcha is solved."
-    )
-    helpEmbed2.add_field(
-        name=f'set_ticket',
-        value="Sets channel for reaction tickets and category for channel creation."
-    )
-    helpEmbed2.add_field(
-        name=f'set_log_channel',
-        value="Sets log channel."
-    )
-    helpEmbed2.add_field(
-        name=f'set_level_channel',
-        value="Sets level notifictaion channel."
-    )
-    helpEmbed2.add_field(
+    helpEmbedSubmissions.add_field(
         name=f'set_submission_channel',
         value="Sets submission channel."
     )
-    helpEmbed2.add_field(
+    helpEmbedSubmissions.add_field(
+        name=f'approve',
+        value="Approves a submission.",
+        inline=True)
+    helpEmbedSubmissions.add_field(
+        name=f'deny',
+        value="Denies a submission.",
+        inline=True)
+    helpEmbedLevels = discord.Embed(
+        title="Help! (Levels)",
+        description=f"These are the available commands!\nType '{configuration['Prefixes'][0]}help [command name]' for more info about a command.",
+        color=0xFF5733, inline=True
+    )
+    helpEmbedMisc = discord.Embed(
+        title="Help! (Miscellaneous)",
+        description=f"These are the available commands!\nType '{configuration['Prefixes'][0]}help [command name]' for more info about a command.",
+        color=0xFF5733, inline=True
+    )
+    helpEmbedCC = discord.Embed(
+        title="Help! (Bins & Validation)",
+        description=f"These are the available commands!\nType '{configuration['Prefixes'][0]}help [command name]' for more info about a command.",
+        color=0xFF5733, inline=True
+    )
+    helpEmbedCaptcha = discord.Embed(
+        title="Help! (Captcha)",
+        description=f"These are the available commands!\nType '{configuration['Prefixes'][0]}help [command name]' for more info about a command.",
+        color=0xFF5733, inline=True
+    )
+    helpEmbedTickets = discord.Embed(
+        title="Help! (Tickets)",
+        description=f"These are the available commands!\nType '{configuration['Prefixes'][0]}help [command name]' for more info about a command.",
+        color=0xFF5733, inline=True
+    )
+    helpEmbedLevels.set_footer(text="Arguments between [] are required.\nArguments between <> are optional.\n[<> or <>] means it is required to use one.")
+    helpEmbedLevels.add_field(
+        name=f'level',
+        value="Lists level and xp."
+    )
+    helpEmbedLevels.add_field(
+        name=f'leaderboard',
+        value="Level leaderboard."
+    )
+    helpEmbedCC.add_field(
+        name=f'generate',
+        value="Generates CC. (Must be 6 chars)"
+    )
+    helpEmbedCC.add_field(
+        name=f'validate',
+        value="Validates a CC."
+    )
+    helpEmbedMisc.add_field(
+        name=f'afk',
+        value="Sets user as AFK."
+    )
+    helpEmbedMisc.add_field(
+        name=f'unafk',
+        value="Removes user AFK."
+    )
+    helpEmbedMisc.add_field(
+        name=f'whois',
+        value="Sends user info."
+    )
+    helpEmbedCaptcha.add_field(
+        name=f'verify',
+        value="Initiates a captcha verification."
+    )
+    helpEmbedTickets.add_field(
+        name=f'close_ticket',
+        value="Closes a ticket."
+    )
+    helpEmbedBackup = discord.Embed(
+        title="Help! (Backup & Restore)",
+        description=f"These are the available commands!\nType '{configuration['Prefixes'][0]}help [command name] for more info about a command.",
+        color=0xFF5733, inline=True
+    )
+    helpEmbedReaction = discord.Embed(
+        title="Help! (Auto-React)",
+        description=f"These are the available commands!\nType '{configuration['Prefixes'][0]}help [command name] for more info about a command.",
+        color=0xFF5733, inline=True
+    )
+    helpEmbedBackup.set_footer(text="Arguments between [] are required.\nArguments between <> are optional.\n[<> or <>] means it is required to use one.")
+    helpEmbedBackup.add_field(
+        name=f'backup',
+        value="Backup the server."
+    )
+    helpEmbedBackup.add_field(
+        name=f'restore',
+        value="Restore a backup."
+    )
+    helpEmbedMisc.add_field(
+        name=f'kick',
+        value="Kick a user."
+    )
+    helpEmbedMisc.add_field(
+        name=f'ban',
+        value="Ban a user."
+    )
+    helpEmbedCaptcha.add_field(
+        name=f'set_min_age',
+        value="Sets minimum age required to join server."
+    )
+    helpEmbedCaptcha.add_field(
+        name=f'set_verified_role',
+        value="Sets a role to be assigned when captcha is solved."
+    )
+    helpEmbedTickets.add_field(
+        name=f'set_ticket',
+        value="Sets channel for reaction tickets and category for channel creation."
+    )
+    helpEmbedTickets.add_field(
+        name=f'set_log_channel',
+        value="Sets log channel."
+    )
+    helpEmbedLevels.add_field(
+        name=f'set_level_channel',
+        value="Sets level notifictaion channel."
+    )
+    helpEmbedReaction.add_field(
         name=f'add_reaction',
         value="Add an auto react reaction to channel."
     )
-    helpEmbed2.add_field(
+    helpEmbedReaction.add_field(
         name=f'stop_reactions',
         value="Stops auto react."
     )
-    helpEmbed2.add_field(
+    helpEmbedLevels.add_field(
         name=f'add_level_role',
         value="Adds a role to a level."
     )
-    helpEmbed2.add_field(
+    helpEmbedLevels.add_field(
         name=f'blacklist',
         value="Blacklists a role to prevent from leveling."
     )
-    helpEmbed2.add_field(
+    helpEmbedLevels.add_field(
         name=f'unblacklist',
         value="Unblacklists."
     )
     paginator = DiscordUtils.Pagination.CustomEmbedPaginator(ctx, remove_reactions=True)
     paginator.add_reaction('\u25c0', "back")
     paginator.add_reaction('\u25b6', "next")
-    embeds = [helpEmbed, helpEmbed2]
+    embeds = [helpEmbedSubmissions, helpEmbedBackup, helpEmbedCaptcha, helpEmbedCC, helpEmbedLevels, helpEmbedReaction, helpEmbedTickets, helpEmbedMisc]
     await paginator.run(embeds)
 
 ##############################
@@ -570,7 +598,7 @@ async def add(ctx, title, link, description):
         password_characters = string.digits
         UniqueID = ''.join(random.choice(password_characters) for _ in range(12))
 
-        AwaitingApproval = discord.Embed(title=title, description=f"Submitter: <@{ctx.message.author.id}>", color=0x77c128)
+        AwaitingApproval = discord.Embed(title=title, description=f"Submitter: <@{ctx.message.author.id}>", color=0xFF5733)
         AwaitingApproval.add_field(name=link, value=description, inline=False)
         AwaitingApproval.add_field(name="Unique ID", value=int(UniqueID), inline=False)
 
@@ -607,7 +635,7 @@ async def approve(ctx, UniqueID, ChannelID: Optional[int]):
         await ctx.send("No channel was mentioned and no ID was provided.")
     ApprovedSub = discord.Embed(
         title=data.title, description=f"Thanks to <@{data.user_id}>!\n\n**{data.link}**\n{data.description}"
-        if data.link else f"Thanks to <@{data.user_id}>!\n\n{data.description}", color=0x77c128)
+        if data.link else f"Thanks to <@{data.user_id}>!\n\n{data.description}", color=0xFF5733)
 
     await channel.send(embed=ApprovedSub)
     await ctx.send("Approved!")
@@ -639,7 +667,7 @@ async def deny(ctx, UniqueID):
 async def set_ticket(ctx, category_id):
     global configuration
     global x
-    embed = discord.Embed(name="Create Ticket", description="React with :e_mail: to create a ticket")
+    embed = discord.Embed(name="Create Ticket", description="React with :e_mail: to create a ticket", color=0xFF5733)
     channel = ctx.message.channel.id
     message = await ctx.send(embed=embed)
     await message.add_reaction("📧")
@@ -1055,7 +1083,7 @@ async def leaderboard(ctx):
     for x in data:
         stringThing = stringThing + f"#{rank} <@{x['user_id']}> : Level {x['level']}\n"
         rank += 1
-    embed = discord.Embed(title="Leaderboard", description=stringThing)
+    embed = discord.Embed(title="Leaderboard", description=stringThing, color=0xFF5733)
     await ctx.send(embed=embed)
 
 
