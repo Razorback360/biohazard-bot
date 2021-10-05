@@ -53,7 +53,7 @@ async def on_ready():
     await Tortoise.generate_schemas()
 
     chat_exporter.init_exporter(bot)
-    print("Im online and ready!")
+    print(f"Im online and ready! \nID: {bot.user.id}")
 
 
 @bot.event
@@ -1185,6 +1185,26 @@ async def add_level_role(ctx, level, role_id: Optional[int]):
     else:
         await ctx.send("No level was provided.")
 
+@bot.command()
+@commands.has_permissions(manage_roles=True)
+@commands.cooldown(1, 10, commands.BucketType.user)
+async def setlevel(ctx, member: discord.Member = None,  level: int = 0):
+    if member == None:
+        try:
+            await Levels.get(user_id=ctx.message.author.id)
+        except DoesNotExist:
+            await Levels(user_id = ctx.message.author.id, level=level, experience=level ** 3)
+        await Levels.filter(user_id=ctx.message.author.id).update(level=level, experience=level ** 3)
+
+        await ctx.send("Level set.")
+    else:
+        try:
+            await Levels.get(user_id=member.id)
+        except DoesNotExist:
+            await Levels(user_id = member.id, level=level, experience=level ** 3)
+        await Levels.filter(user_id=member.id).update(level=level, experience=level ** 3)
+
+        await ctx.send(f"Level set for {member.mention}.")
 
 ##############################
 #                            #
@@ -1212,6 +1232,7 @@ async def add_level_role(ctx, level, role_id: Optional[int]):
 @ban.error
 @kick.error
 @set_ticket.error
+@setlevel.error
 async def error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
         await ctx.send(error)
