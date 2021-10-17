@@ -95,8 +95,7 @@ async def on_message(message):
         try:
             channel_reactions = await ReactionChannels.get(channel_id=message.channel.id)
             channel_reactions = await ReactionChannels.get(channel_id=message.channel.id).values()
-            for channel in channel_reactions:
-                reactions = json.loads(channel['reactions'])
+            reactions = json.loads(channel_reactions['reactions'])
             for reaction in reactions:
                 emoji = discord.utils.get(bot.emojis, name=reaction)
                 await message.add_reaction(emoji if emoji else reaction)
@@ -720,9 +719,15 @@ async def backup(ctx):
 
     jsonVar = []
     for role in roles:
-        jsonVar.append({"role": role.name,
-                        "permissions": {permission[0]: permission[1] for permission in role.permissions},
-                        "color": role.color.value, "position": role.position})
+        if isinstance(role, discord.Role):
+            if "everyone" in role.name:
+                pass
+            else:
+                jsonVar.append({"role": role.name,
+                                "permissions": {permission[0]: permission[1] for permission in role.permissions},
+                                "color": role.color.value, "position": role.position})
+        else:
+            pass
     for role in jsonVar:
         await BackupRoles(rolename=role['role'], permissisons=json.dumps(role['permissions']), color=role['color'], position=role['position']).save()
     for member in members:
@@ -875,8 +880,7 @@ async def add_reaction(ctx, channel_id: Optional[int]):
     try:
         reactionsobj = await ReactionChannels.get(channel_id=channel_id_message if channel_id_message else channel_id)
         reactions = await ReactionChannels.get(channel_id=channel_id_message if channel_id_message else channel_id).values()
-        for reaction in reactions:
-            newreactions = json.loads(reaction['reactions'])
+        newreactions = json.loads(reactions['reactions'])
         for stuff in newreactions:
             if stuff == emoji:
                 await ctx.send("Reaction already present.")
@@ -966,7 +970,7 @@ async def set_verified_role(ctx, role_id: Optional[int]):
 async def verify(ctx):
     if 'VerifiedRole' in configuration:
         role = ctx.guild.get_role(int(configuration['VerifiedRole']))
-        captcha = discapty.Captcha("wheezy")
+        captcha = discapty.Captcha("wheezy", code_length=6).setup()
         captcha_image = discord.File(captcha.generate_captcha(), filename="captcha.png")
         try:
             await ctx.message.author.send("This captcha is Case Sensitive. You have 2 minutes and 3 tries to solve the captcha.", file=captcha_image)

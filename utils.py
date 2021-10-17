@@ -45,5 +45,8 @@ def cvv_date():
 
 
 def clean_dir(dir):
-    for i in os.listdir(dir):
-        os.remove(f"{dir}/{i}")
+    try:
+        for i in os.listdir(dir):
+            os.remove(f"{dir}/{i}")
+    except:
+        os.mkdir(dir)
