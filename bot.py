@@ -686,7 +686,7 @@ async def set_ticket(ctx, category_id):
 @bot.command()
 async def close_ticket(ctx):
     if "LogChannel" in configuration:
-        log = bot.get_channel(id=configuration['LogChannelID'])
+        log = bot.get_channel(id=configuration['LogChannel'])
         transcript = await chat_exporter.export(ctx.channel)
 
         if transcript is None:
