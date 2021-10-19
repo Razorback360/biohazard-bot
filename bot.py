@@ -100,7 +100,7 @@ async def on_message(message):
                 emoji = discord.utils.get(bot.emojis, name=reaction)
                 await message.add_reaction(emoji if emoji else reaction)
         except DoesNotExist:
-            passset_log
+            pass
     await bot.process_commands(message)
 
 
