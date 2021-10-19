@@ -100,7 +100,7 @@ async def on_message(message):
                 emoji = discord.utils.get(bot.emojis, name=reaction)
                 await message.add_reaction(emoji if emoji else reaction)
         except DoesNotExist:
-            pass
+            passset_log
     await bot.process_commands(message)
 
 
@@ -685,7 +685,7 @@ async def set_ticket(ctx, category_id):
 
 @bot.command()
 async def close_ticket(ctx):
-    if configuration['LogChannelID']:
+    if "LogChannel" in configuration:
         log = bot.get_channel(id=configuration['LogChannelID'])
         transcript = await chat_exporter.export(ctx.channel)
 
@@ -697,7 +697,7 @@ async def close_ticket(ctx):
         await log.send(file=transcript_file)
     else:
         await ctx.send("Log channel is not setup. This ticket will not have a transcript. Please set a log channel if you would like transcripts")
-    await asyncio.wait(3)
+    await asyncio.sleep(3)
     await ctx.channel.delete()
 
 
