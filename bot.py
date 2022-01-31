@@ -19,7 +19,6 @@ import json
 from tortoise import Tortoise
 from database import Levels, AFK, Submissions, RoleBlacklist, LevelRole, BackupMessages, BackupChannels, BackupRoles, BackupUsers, ReactionChannels
 from tortoise.exceptions import DoesNotExist
-import chat_exporter
 import io
 import discapty
 import asyncio
@@ -52,7 +51,6 @@ async def on_ready():
     )
     await Tortoise.generate_schemas()
 
-    chat_exporter.init_exporter(bot)
     print(f"Im online and ready! \nID: {bot.user.id}")
 
 
@@ -683,24 +681,6 @@ async def set_ticket(ctx, category_id):
     await ctx.message.delete()
 
 
-@bot.command()
-async def close_ticket(ctx):
-    if "LogChannel" in configuration:
-        log = bot.get_channel(id=configuration['LogChannel'])
-        transcript = await chat_exporter.export(ctx.channel)
-
-        if transcript is None:
-            return
-
-        transcript_file = discord.File(io.BytesIO(transcript.encode()), filename=f"transcript-{ctx.channel.name}.html")
-
-        await log.send(file=transcript_file)
-    else:
-        await ctx.send("Log channel is not setup. This ticket will not have a transcript. Please set a log channel if you would like transcripts")
-    await asyncio.sleep(3)
-    await ctx.channel.delete()
-
-
 ##############################
 #                            #
 #      BACKUP & RESTORE      #
@@ -792,10 +772,13 @@ async def restore(ctx):
     roleposdict = {}
 
     for role in roles:
-        permissions = json.loads(role['permissisons'])
-        permissions = discord.Permissions(**permissions)
-        roleobject = await guild.create_role(name=role['rolename'], permissions=permissions, colour=int(role['color']))
-        roleposdict[roleobject if role['rolename'] != "@everyone" else guild.default_role] = role['position']
+        if discord.utils.get(ctx.guild.roles,name=role['rolename']) is not None:
+            permissions = json.loads(role['permissisons'])
+            permissions = discord.Permissions(**permissions)
+            roleobject = await guild.create_role(name=role['rolename'], permissions=permissions, colour=int(role['color']))
+            roleposdict[roleobject if role['rolename'] != "@everyone" else guild.default_role] = role['position']
+        else:
+            pass
 
     await guild.edit_role_positions(roleposdict)
 
